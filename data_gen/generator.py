@@ -668,7 +668,7 @@ def generate_ring_transactions(base_time: datetime) -> list[dict]:
 
     # Add two round amount transactions to push total to ~₹4.90L
     for extra_amt in [10000.00, 10047.00]:
-        inflow_t += timedelta(minutes=2)
+        inflow_t = base_time.replace(hour=11, minute=28, second=0) if extra_amt == 10000.00 else base_time.replace(hour=11, minute=30, second=0)
         txns.append({
             "txn_id": f"TXN-{txn_counter:08d}",
             "from_account": "ACC-5510",
