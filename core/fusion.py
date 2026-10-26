@@ -126,3 +126,7 @@ def score(account_id: str, ctx: dict = None) -> dict:
         "rule_details": rule_res,
         "baseline_details": baseline_res,
     }
+
+
+# Alias for compatibility
+evaluate_account = score
