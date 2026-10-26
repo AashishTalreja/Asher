@@ -1,0 +1,44 @@
+name: CI & Forensic Pipeline Validation
+
+on:
+  push:
+    branches: [ "main", "phase-*" ]
+  pull_request:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  validate:
+    name: Python 3.11 Environment & Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11 Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify Deterministic Data Generation
+        run: |
+          python data_gen/generator.py --seed 42 --out data/
+
+      - name: Verify Core Detection & Weighted Fusion Engine
+        run: |
+          python -c "from core import fusion; res = fusion.evaluate_account('ACC-22451'); assert res['score'] >= 80, 'Score must be CRITICAL'; print('Detection test passed. ACC-22451 Score:', res['score'], res['tier'])"
+
+      - name: Verify BSA §63 Electronic Evidence PDF Export
+        run: |
+          python -c "from core import report; res = report.generate_pdf('ACC-22451'); assert res['sha256'], 'SHA-256 digest missing'; print('PDF test passed. SHA-256:', res['sha256'])"
+
+      - name: Execute Terminal UI Smoke Test (Fallback Mode)
+        run: |
+          python main.py ACC-22451 --fallback
