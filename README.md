@@ -137,7 +137,7 @@ Built with `rich` and `prompt_toolkit`. Capped at 100 columns for hackathon proj
 ### Screen 3: Account 360 Hero Screen
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ ACCOUNT 360 · ACC-22451 · RISK 99.9 [CRITICAL]                                                   │
+│ ACCOUNT 360 · ACC-22451 · RISK 99.9 (capped from 100.0) [CRITICAL]                               │
 │ Holder: Rahul Kumar · Account Age: 115 days · District: Patna · Bank: SBI (SBIN0001234)          │
 │ Phone: +91-9812345678 · Device: DEV-a8f3e2 · KYC: MINIMAL · Data Quality: OK                     │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘

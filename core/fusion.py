@@ -154,6 +154,7 @@ def score(account_id: str, ctx: dict = None) -> dict:
 
     return {
         "score": final_score,
+        "uncapped_score": round(raw_score * 100.0, 1),
         "tier": tier,
         "contributions": contributions,
         "confidence": confidence,

@@ -379,6 +379,8 @@ class CLIApp:
             kyc = "PENDING"
 
         data_quality = "OK" if confidence == "normal" else "LIMITED (cold-start)"
+        uncapped = res.get("uncapped_score", score)
+        cap_note = f" (capped from {uncapped:.1f})" if uncapped > score else ""
 
         tier_style = "bold red" if tier in ["CRITICAL", "HIGH"] else "bold green"
         if self.fallback:
@@ -389,12 +391,14 @@ class CLIApp:
         # -------------------------------------------------------------------
         header_text = Text()
         if self.fallback:
-            header_text.append(f"ACCOUNT 360: {account_id} | RISK SCORE: {score}/100 [{tier}]\n", style="bold")
+            header_text.append(f"ACCOUNT 360: {account_id} | RISK SCORE: {score}/100{cap_note} [{tier}]\n", style="bold")
             header_text.append(f"Holder: {holder} | Account Age: {age_days} days | District: {district} | Bank: {bank} ({branch})\n")
             header_text.append(f"Phone: {phone} | Device: {device_id} | KYC: {kyc} | Data Quality: {data_quality}")
         else:
             header_text.append(f"ACCOUNT 360 · {account_id} · ", style="bold white")
             header_text.append(f"RISK {score:.1f} ", style=tier_style)
+            if cap_note:
+                header_text.append(f"{cap_note.strip()} ", style="dim")
             header_text.append(f"[{tier}]\n", style=tier_style)
             header_text.append(Text.from_markup(f"Holder: [bold]{holder}[/] · Account Age: {age_days} days · District: [cyan]{district}[/] · Bank: {bank} ({branch})\n", style="white"))
             header_text.append(Text.from_markup(f"Phone: [cyan]{phone}[/] · Device: [yellow]{device_id}[/] · KYC: [magenta]{kyc}[/] · Data Quality: [bold]{data_quality}[/]", style="white"))
@@ -403,9 +407,10 @@ class CLIApp:
         # Layout Section 2: Layer Contribution Bars (Weighted Fusion)
         # -------------------------------------------------------------------
         contrib_table = Table(box=None, padding=(0, 1), show_header=False, width=90)
-        contrib_table.add_column("Layer", width=24, style="bold white")
-        contrib_table.add_column("Visual Bar", width=34)
-        contrib_table.add_column("Layer Score", width=12, justify="right")
+        # Column widths + padding fit within width=90 so long layer names don't wrap onto a second line
+        contrib_table.add_column("Layer", width=28, style="bold white")
+        contrib_table.add_column("Visual Bar", width=26)
+        contrib_table.add_column("Layer Score", width=10, justify="right")
         contrib_table.add_column("Weight Pts", width=18, justify="right")
 
         contrib_table.add_row(
@@ -514,12 +519,13 @@ class CLIApp:
         feat_vals = ml_details.get("feature_values", {})
         weighted = [(name, imp) for name, imp in ml_details.get("top_features", []) if imp > 0][:3]
         ml_text = Text()
-        ml_text.append(f"  Random Forest fraud probability: {ml_details.get('score', 0.0):.4f}\n")
+        ml_prob = ml_details.get("score", 0.0)
+        ml_text.append(f"  Random Forest fraud probability: {'> 99.9%' if ml_prob >= 0.999 else f'{ml_prob:.1%}'}\n")
         if weighted:
             for i, (name, imp) in enumerate(weighted, 1):
                 val = feat_vals.get(name, 0.0)
                 val_str = f"{val:,.0f}" if float(val).is_integer() else f"{val:,.2f}"
-                ml_text.append(f"  {i}. {name} = {val_str}  (model importance {imp:.0%})\n", style="" if self.fallback else "bold")
+                ml_text.append(f"  {i}. {name} = {val_str}  (global importance {imp:.0%})\n", style="" if self.fallback else "bold")
             if len(weighted) < 3:
                 ml_text.append("  Other features carry 0% importance in the trained model.", style="dim")
         else:

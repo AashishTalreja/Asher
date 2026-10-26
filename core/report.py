@@ -161,6 +161,8 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     # Evaluate account through all 5 layers
     eval_res = fusion.evaluate_account(account_id, ctx=ctx)
     score = eval_res["score"]
+    uncapped = eval_res.get("uncapped_score", score)
+    cap_note = f" (capped from {uncapped:.1f})" if uncapped > score else ""
     tier = eval_res["tier"]
     confidence = eval_res["confidence"]
     data_quality = "OK" if confidence == "normal" else "LIMITED (cold-start)"
@@ -347,7 +349,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     tier_bg = colors.HexColor("#DC2626") if tier in ["CRITICAL", "HIGH"] else colors.HexColor("#16A34A")
     banner_data = [
         [
-            Paragraph(f"FINAL FUSED RISK SCORE: <b>{score:.1f} / 100.0</b>", alert_badge_style),
+            Paragraph(f"FINAL FUSED RISK SCORE: <b>{score:.1f} / 100.0</b>{cap_note}", alert_badge_style),
             Paragraph(f"SEVERITY TIER: <b>{tier}</b>", alert_badge_style),
             Paragraph(f"DATA QUALITY: <b>{data_quality}</b>", alert_badge_style),
         ]
@@ -371,7 +373,9 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
         ["Layer 3: ML Risk Scorer", "20-Feature Random Forest", f"{contributions['ml']:.4f}", "35%", f"{0.35 * contributions['ml'] * 100:.1f} pts"],
         ["Layer 4: Complaint Correlator", "4-Step RapidFuzz NCRP Match", f"{contributions['complaint']:.4f}", "15%", f"{0.15 * contributions['complaint'] * 100:.1f} pts"],
         ["Layer 5: Graph / Ring", "Louvain Mule Ring & 5-Hop BFS", f"{contributions['graph']:.4f}", "10%", f"{0.10 * contributions['graph'] * 100:.1f} pts"],
-        ["<b>TOTAL COMPOSITE</b>", "<b>Weighted Fusion Formula</b>", "<b>1.0000</b>", "<b>100%</b>", f"<b>{score:.1f} / 100 pts</b>"],
+        # Paragraphs (not plain strings) so the <b> markup renders instead of printing literally
+        [Paragraph("TOTAL COMPOSITE", body_bold), Paragraph("Weighted Fusion Formula", body_bold),
+         Paragraph("1.0000", body_bold), Paragraph("100%", body_bold), Paragraph(f"<b>{score:.1f} / 100 pts</b>{cap_note}", body_style)],
     ]
     w_table = Table(weights_data, colWidths=[135, 145, 80, 65, 90])
     w_table.setStyle(TableStyle([
