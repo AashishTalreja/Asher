@@ -46,12 +46,6 @@ END-TO-END PIPELINE
    wrapped narrations and remove repeated headers. Normalize Indian dates,
    number formats, Cr/Dr suffixes and debit/credit layouts. Channel-specific
    narration patterns extract references, counterparties and cash-out details.
-4. Validate running balances and file parse confidence; flag failing rows.
-   Officers compare source and parsed rows; edits enter the audit log.
-5. Match transfers in order: exact reference (0.99 confidence), UPI handle
-   (0.9), then amount/time (same amount, within 10 minutes, fuzzy name score
-   at least 85; confidence 0.6–0.8). An unmatched counterparty becomes a
-   “statement not yet received” placeholder with a draft bank notice.
 6. Build CFCFRMS-style Layer 1, 2, 3... trails; label layering, fan-out, fan-in,
    cycles and cash-out. Flag AePS, ATM and CSP cash-out points.
 7. Score accounts, correlate complaints, rank leads and prioritize freezes.
