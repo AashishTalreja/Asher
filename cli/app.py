@@ -44,6 +44,7 @@ except ImportError:
     HAS_PROMPT_TOOLKIT = False
 
 from core import fusion
+from core import report
 from core.config import FUSION_WEIGHTS
 
 
@@ -752,33 +753,79 @@ ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
     # Screen 8: Export Evidence Report (BSA §63)
     # =======================================================================
     def screen_export_evidence(self, account_id: str = "ACC-22451") -> None:
-        """Simulate court-admissible electronic evidence dossier export."""
+        """Export court-admissible electronic evidence dossier compliant with BSA Section 63."""
         box_style = box.ASCII if self.fallback else box.ROUNDED
         self.console.clear()
         self.console.print("\n")
 
-        timestamp_str = datetime.now().strftime("%Y-%m-%d %H:%M:%S IST")
-        hash_seed = f"{account_id}-{timestamp_str}-BIHAR-POLICE-CFU".encode()
-        sha256_hash = hashlib.sha256(hash_seed).hexdigest()
+        # Generate real PDF evidence report using core.report
+        res = report.generate_pdf(account_id, ctx=self.ctx)
+        pdf_path = res["path"]
+        pdf_sha256 = res["sha256"]
+        payload_hash = res["payload_hash"]
+        case_ref = res["case_ref"]
+        gen_time = res["generated_at"]
+
+        # Retrieve evaluation metrics for display
+        eval_res = fusion.evaluate_account(account_id, ctx=self.ctx)
+        score = eval_res["score"]
+        tier = eval_res["tier"]
+        rule_details = eval_res.get("rule_details", {})
+        baseline_details = eval_res.get("baseline_details", {})
+        complaint_details = eval_res.get("complaint_details", [])
+        graph_details = eval_res.get("graph_details", {})
+
+        # Holder info
+        accounts_df = self.ctx.get("accounts_df")
+        holder = "Unknown Holder"
+        district = "Patna"
+        if accounts_df is not None:
+            r = accounts_df[accounts_df["account_id"] == account_id]
+            if not r.empty:
+                holder = r.iloc[0].get("holder_name", holder)
+                district = r.iloc[0].get("district", district)
+
+        fired_rules = rule_details.get("fired", [])
+        fired_names = ", ".join([f["rule"] for f in fired_rules[:4]]) if fired_rules else "None"
+        z_amt = baseline_details.get("z_amt", 0.0)
+        chain_type = graph_details.get("chain_type", "LAYERING")
+        hop_count = graph_details.get("hop_count", 0)
 
         report_text = Text()
-        report_text.append("BHARATIYA SAKSHYA ADHINIYAM (BSA) 2023 - SECTION 63 COMPLIANT DOSSIER\n", style="bold")
-        report_text.append(f"  Target Account:      {account_id} (Rahul Kumar, Patna)\n")
-        report_text.append(f"  Case Reference:      BIH/CFU/2026/0117\n")
-        report_text.append(f"  Export Timestamp:    {timestamp_str}\n")
-        report_text.append(f"  SHA-256 Hash Chain:  {sha256_hash}\n")
-        report_text.append(f"  Destination Path:    reports/{account_id}-evidence-{datetime.now().strftime('%Y%m%d')}.pdf\n\n")
-        report_text.append("Dossier Summary:\n", style="bold")
-        report_text.append("  - Fused Risk Score:  91.0 / 100.0 [CRITICAL]\n")
-        report_text.append("  - Core RBI Rules:    9 Red-Flag Rules Fired (Structuring, Dormancy, Shared Entity)\n")
-        report_text.append("  - Baseline Jump:     604.6 sigma deviation above account normal\n")
-        report_text.append("  - Layering Chain:    Victim -> ACC-22451 -> ACC-10033 -> ACC-99810 -> ATM Muzaffarpur\n")
-        report_text.append("  - Linked NCRP Cases: 7 complaints (INR 4.90L) across Patna & Nalanda districts\n\n")
-        report_text.append("[+] Court-admissible electronic certificate generated successfully.", style="bold green" if not self.fallback else "bold")
+        if self.fallback:
+            report_text.append("BHARATIYA SAKSHYA ADHINIYAM (BSA) 2023 - SECTION 63 COMPLIANT DOSSIER\n", style="bold")
+            report_text.append(f"  Target Account:      {account_id} ({holder}, {district})\n")
+            report_text.append(f"  Case Reference:      {case_ref}\n")
+            report_text.append(f"  Export Timestamp:    {gen_time}\n")
+            report_text.append(f"  SHA-256 PDF Hash:    {pdf_sha256}\n")
+            report_text.append(f"  Payload Seal Hash:   {payload_hash}\n")
+            report_text.append(f"  Destination Path:    {pdf_path}\n\n")
+            report_text.append("Dossier Evidentiary Summary:\n", style="bold")
+            report_text.append(f"  - Fused Risk Score:  {score:.1f} / 100.0 [{tier}]\n")
+            report_text.append(f"  - Core RBI Rules:    {len(fired_rules)} Rules Fired ({fired_names})\n")
+            report_text.append(f"  - Baseline Jump:     {z_amt:.1f} sigma deviation above 90-day normal\n")
+            report_text.append(f"  - Layering Trail:    {chain_type} ({hop_count} hops)\n")
+            report_text.append(f"  - Linked NCRP Cases: {len(complaint_details)} complaints verified\n\n")
+            report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.")
+        else:
+            report_text.append("BHARATIYA SAKSHYA ADHINIYAM (BSA) 2023 · SECTION 63 COMPLIANT DOSSIER\n", style="bold white")
+            report_text.append(f"  Target Account:      [bold cyan]{account_id}[/] ({holder}, [cyan]{district}[/])\n")
+            report_text.append(f"  Case Reference:      [bold yellow]{case_ref}[/]\n")
+            report_text.append(f"  Export Timestamp:    {gen_time}\n")
+            report_text.append(f"  SHA-256 PDF Hash:    [bold green]{pdf_sha256}[/]\n")
+            report_text.append(f"  Payload Seal Hash:   [dim]{payload_hash}[/]\n")
+            report_text.append(f"  Destination Path:    [bold underline]{pdf_path}[/]\n\n")
+            report_text.append("Dossier Evidentiary Summary:\n", style="bold white")
+            report_text.append(f"  - Fused Risk Score:  [bold red]{score:.1f} / 100.0[/] [{tier}]\n")
+            report_text.append(f"  - Core RBI Rules:    [red]{len(fired_rules)} Rules Fired[/] ({fired_names})\n")
+            report_text.append(f"  - Baseline Jump:     [yellow]{z_amt:.1f} sigma[/] deviation above 90-day normal\n")
+            report_text.append(f"  - Layering Trail:    [magenta]{chain_type}[/] ({hop_count} hops)\n")
+            report_text.append(f"  - Linked NCRP Cases: [bold red]{len(complaint_details)} verified incidents[/]\n\n")
+            report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.", style="bold green")
 
         panel = Panel(
             report_text,
-            title="EVIDENCE REPORT EXPORT · BSA §63 ELECTRONIC RECORD",
+            title="EVIDENCE REPORT EXPORT · BSA SECTION 63 ELECTRONIC RECORD",
             box=box_style,
             border_style="green" if not self.fallback else "white"
         )
