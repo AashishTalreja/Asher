@@ -631,53 +631,6 @@ Responsible for:
 
 These are demonstration targets or scenario figures, not verified real-world outcomes.
 
----
-
-# 16. Development and Submission Guidelines
-
-## 16.1 Repository Rules
-
-- Maintain a private GitHub repository named after the team.
-- Add all three members as collaborators.
-- Each member must commit their own work using their own GitHub account.
-- Make iterative commits rather than submitting one final code dump.
-- Develop using team members' own systems.
-
-## 16.2 Branching and Review
-
-Use feature branches following:
-
-`feat/<area>-<short-name>`
-
-The `main` branch must remain protected.
-
-Changes require a pull request and one review.
-
-Development should proceed in small, reviewable steps, with a suggested commit message after each logical change.
-
-## 16.3 Data Protection
-
-- Never commit actual customer records.
-- Never upload genuine customer bank statements.
-- Never commit credentials or secrets.
-- Keep `.env` excluded through `.gitignore`.
-- Use synthetic data for demonstration.
-
-## 16.4 Integration Requirement
-
-The core demonstration workflow must remain functional throughout development:
-
-**Complaint → Statement Upload → Money Trail → Freeze Plan → Notices / Case PDF**
-
-## 16.5 Claims and Evidence
-
-Do not invent project statistics or evaluation results.
-
-Mark unsupported numerical claims with:
-
-`[SOURCE NEEDED]`
-
----
 
 # 17. Contingency Plan
 
