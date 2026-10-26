@@ -19,7 +19,7 @@
 > A dormant student account receives ₹4.9L in 12 credits within 40 min, then starts fanning out.
 
 1. Alert fires in < 60s — risk 84
-2. Account 360 shows baseline deviation (23σ), rule trace, score history
+2. Account 360 shows baseline deviation (~32x normal amount), fired RBI/FIU-IND Indicators, layer contributions
 3. Money Trail shows 4-hop chain ending at ATM Muzaffarpur
 4. Network Explorer reveals 3 shared devices
 5. Officer creates case, exports BSA §63 PDF
@@ -32,7 +32,7 @@
 1. Complaint ingested; UPI extracted
 2. Fuzzy match → `rahul.kumar@ybl` (91% confidence)
 3. Cross-reference shows same account in 6 other complaints
-4. Risk score jumps 34 → 78
+4. Linked complaints raise the fused risk score into the CRITICAL tier
 5. Network view reveals 12-account ring
 6. Officer opens **network-level case**, not single-complaint case
 7. **Total: 90 seconds** for pipeline

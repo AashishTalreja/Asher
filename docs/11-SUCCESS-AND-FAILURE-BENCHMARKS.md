@@ -90,8 +90,8 @@ Typical judging dimensions and how we score:
 |---|---|
 | **C1 (Hour 1)**: No commits | STOP — fix git first |
 | **C2 (Hour 6)**: No data generator | Fall back to hardcoded JSON |
-| **C3 (Hour 12)**: Rules + baseline broken | Drop XGBoost, use rules + baseline |
-| **C4 (Hour 18)**: XGBoost AUC < 0.75 | Drop ML layer entirely |
+| **C3 (Hour 12)**: Rules + baseline broken | Drop the ML layer, use rules + baseline |
+| **C4 (Hour 18)**: RandomForest AUC < 0.75 | Drop ML layer entirely |
 | **C5 (Hour 20)**: Alternate dataset fails | Hardcode-fix loader, ship |
 | **C6 (Hour 24)**: Account 360 broken | Stop all features, polish this screen only |
 | **C7 (Hour 26)**: No video started | Person C records immediately |

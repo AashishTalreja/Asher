@@ -40,6 +40,7 @@ from reportlab.platypus import (
 from reportlab.pdfgen import canvas
 
 from core import fusion
+from core.baseline import format_deviation
 
 
 # ---------------------------------------------------------------------------
@@ -160,8 +161,11 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     # Evaluate account through all 5 layers
     eval_res = fusion.evaluate_account(account_id, ctx=ctx)
     score = eval_res["score"]
+    uncapped = eval_res.get("uncapped_score", score)
+    cap_note = f" (capped from {uncapped:.1f})" if uncapped > score else ""
     tier = eval_res["tier"]
     confidence = eval_res["confidence"]
+    data_quality = "OK" if confidence == "normal" else "LIMITED (cold-start)"
     contributions = eval_res["contributions"]
     rule_details = eval_res.get("rule_details", {})
     baseline_details = eval_res.get("baseline_details", {})
@@ -323,7 +327,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
             Paragraph("<b>Registered IP Address:</b>", body_style),
             Paragraph(ip_addr, body_style),
             Paragraph("<b>KYC Compliance Status:</b>", body_style),
-            Paragraph(f"<b>{kyc_status}</b> (Age: {age_days} days)", body_style),
+            Paragraph(f"<b>{kyc_status}</b> (Account Age: {age_days} days)", body_style),
         ],
     ]
     meta_table = Table(meta_table_data, colWidths=[110, 150, 110, 145])
@@ -345,9 +349,9 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     tier_bg = colors.HexColor("#DC2626") if tier in ["CRITICAL", "HIGH"] else colors.HexColor("#16A34A")
     banner_data = [
         [
-            Paragraph(f"FINAL FUSED RISK SCORE: <b>{score:.1f} / 100.0</b>", alert_badge_style),
+            Paragraph(f"FINAL FUSED RISK SCORE: <b>{score:.1f} / 100.0</b>{cap_note}", alert_badge_style),
             Paragraph(f"SEVERITY TIER: <b>{tier}</b>", alert_badge_style),
-            Paragraph(f"CONFIDENCE: <b>{confidence.upper()}</b>", alert_badge_style),
+            Paragraph(f"DATA QUALITY: <b>{data_quality}</b>", alert_badge_style),
         ]
     ]
     banner_table = Table(banner_data, colWidths=[200, 160, 155])
@@ -364,12 +368,14 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     # Layer Weight Breakdown Table
     weights_data = [
         ["Detection Layer", "Statutory Target", "Raw Score (0-1)", "Weighting", "Contribution"],
-        ["Layer 1: Rules Engine", "RBI 12 Red-Flag Directives", f"{contributions['rule']:.4f}", "20%", f"{0.20 * contributions['rule'] * 100:.1f} pts"],
+        ["Layer 1: Rules Engine", "12 RBI/FIU-IND Indicators", f"{contributions['rule']:.4f}", "20%", f"{0.20 * contributions['rule'] * 100:.1f} pts"],
         ["Layer 2: Baseline Deviation", "90-Day Rolling Z-Score Anomaly", f"{contributions['baseline']:.4f}", "20%", f"{0.20 * contributions['baseline'] * 100:.1f} pts"],
-        ["Layer 3: ML Risk Scorer", "20-Feature XGBoost Classifier", f"{contributions['ml']:.4f}", "35%", f"{0.35 * contributions['ml'] * 100:.1f} pts"],
+        ["Layer 3: ML Risk Scorer", "20-Feature Random Forest", f"{contributions['ml']:.4f}", "35%", f"{0.35 * contributions['ml'] * 100:.1f} pts"],
         ["Layer 4: Complaint Correlator", "4-Step RapidFuzz NCRP Match", f"{contributions['complaint']:.4f}", "15%", f"{0.15 * contributions['complaint'] * 100:.1f} pts"],
-        ["Layer 5: Graph Ring Ops", "Louvain Mule Ring & 5-Hop BFS", f"{contributions['graph']:.4f}", "10%", f"{0.10 * contributions['graph'] * 100:.1f} pts"],
-        ["<b>TOTAL COMPOSITE</b>", "<b>Weighted Fusion Formula</b>", "<b>1.0000</b>", "<b>100%</b>", f"<b>{score:.1f} / 100 pts</b>"],
+        ["Layer 5: Graph / Ring", "Louvain Mule Ring & 5-Hop BFS", f"{contributions['graph']:.4f}", "10%", f"{0.10 * contributions['graph'] * 100:.1f} pts"],
+        # Paragraphs (not plain strings) so the <b> markup renders instead of printing literally
+        [Paragraph("TOTAL COMPOSITE", body_bold), Paragraph("Weighted Fusion Formula", body_bold),
+         Paragraph("1.0000", body_bold), Paragraph("100%", body_bold), Paragraph(f"<b>{score:.1f} / 100 pts</b>{cap_note}", body_style)],
     ]
     w_table = Table(weights_data, colWidths=[135, 145, 80, 65, 90])
     w_table.setStyle(TableStyle([
@@ -387,9 +393,9 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     story.append(Spacer(1, 8))
 
     # -----------------------------------------------------------------------
-    # Section 2: Fired RBI Red-Flag Rules (Layer 1)
+    # Section 2: Fired RBI/FIU-IND Indicators (Layer 1)
     # -----------------------------------------------------------------------
-    story.append(Paragraph("2. FIRED RBI RED-FLAG RULES (LAYER 1)", section_heading))
+    story.append(Paragraph("2. FIRED RBI/FIU-IND INDICATORS (LAYER 1)", section_heading))
     fired_rules = rule_details.get("fired", [])
     if fired_rules:
         rules_data = [["Rule Identifier", "Weight", "Statutory Condition & Evidentiary Findings"]]
@@ -412,7 +418,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
         ]))
         story.append(rules_table)
     else:
-        story.append(Paragraph("No RBI red-flag rules fired. Account transaction velocity within standard bounds.", body_style))
+        story.append(Paragraph("No RBI/FIU-IND Indicators fired. Account transaction velocity within standard bounds.", body_style))
     story.append(Spacer(1, 8))
 
     # -----------------------------------------------------------------------
@@ -428,9 +434,9 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
     base_summary_data = [
         [
             Paragraph("<b>Amount Deviation:</b>", body_style),
-            Paragraph(f"<b>{z_amt:.2f} sigma</b> above rolling mean", body_bold),
+            Paragraph(f"<b>{format_deviation(z_amt, baseline_details.get('amt_ratio', 0.0), 'amount', 'above rolling mean')}</b>", body_bold),
             Paragraph("<b>Frequency Jump:</b>", body_style),
-            Paragraph(f"<b>{z_freq:.2f} sigma</b> daily spike", body_bold),
+            Paragraph(f"<b>{format_deviation(z_freq, baseline_details.get('freq_ratio', 0.0), 'daily frequency', 'daily spike')}</b>", body_bold),
         ],
         [
             Paragraph("<b>Novel Counterparties:</b>", body_style),
@@ -441,8 +447,8 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
         [
             Paragraph("<b>Forensic Diagnosis:</b>", body_style),
             Paragraph(f"<i>{diagnosis}</i>", body_style),
-            Paragraph("<b>Cold-Start Status:</b>", body_style),
-            Paragraph(f"{confidence.upper()} (Account Age: {age_days}d)", body_style),
+            Paragraph("<b>Data Quality:</b>", body_style),
+            Paragraph(f"{data_quality} (Account Age: {age_days} days)", body_style),
         ]
     ]
     base_table = Table(base_summary_data, colWidths=[120, 140, 110, 145])
@@ -465,7 +471,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
 
     top_feat_str = ", ".join([f"<b>{name}</b> (importance: {wt:.2f})" for name, wt in ml_top[:4]])
     ml_summary = (
-        f"XGBoost Gradient Boosted Classifier (20 engineered features) estimated a mule fraud probability of "
+        f"Class-balanced Random Forest classifier (20 engineered features) estimated a mule fraud probability of "
         f"<b>{ml_prob * 100:.1f}%</b>. Leading predictive features: {top_feat_str}."
     )
     story.append(Paragraph(ml_summary, body_style))

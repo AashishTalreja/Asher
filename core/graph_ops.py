@@ -394,3 +394,74 @@ def ring_risk(account_id: str, ctx: dict = None) -> float:
         score += 0.30
 
     return float(round(min(1.0, score), 4))
+
+
+def shared_network(account_id: str, seed_max_amount: float = 1000.0, ctx: dict = None) -> dict:
+    """
+    Builds the 2-hop shared-entity network around an account for the Network Explorer.
+
+    - Hop 1: accounts sharing a phone/device with the account (entities.csv)
+    - Hop 2: accounts sharing a different phone/device with a hop-1 account
+    - Seed funders: outside accounts that sent small transfers (<= seed_max_amount)
+      into 2+ accounts of this network, the recruiter seeding pattern
+
+    Returns:
+        {
+            'account_id': str,
+            'hop1': [{'type': str, 'value': str, 'accounts': [str, ...]}, ...],
+            'hop2': [{'via': str, 'type': str, 'value': str, 'accounts': [str, ...]}, ...],
+            'seed_funders': [{'account': str, 'targets': [str, ...], 'total': float, 'first_dt': Timestamp}, ...],
+        }
+    """
+    ctx = _get_context(ctx)
+    entities_df = ctx.get("entities_df")
+    result = {"account_id": account_id, "hop1": [], "hop2": [], "seed_funders": []}
+    if entities_df is None or len(entities_df) == 0:
+        return result
+
+    def _shared_entities(acct: str) -> list[tuple[str, str, list[str]]]:
+        """(type, value, other linked accounts) for each phone/device this account shares."""
+        found = []
+        for _, r in entities_df[entities_df["type"].isin(["phone", "device"])].iterrows():
+            linked_accts = [a.strip() for a in str(r["linked_accounts"]).split("|") if a.strip()]
+            if acct in linked_accts and len(linked_accts) > 1:
+                found.append((r["type"], r["value"], [a for a in linked_accts if a != acct]))
+        return found
+
+    # 1. Hop 1: direct shared identifiers
+    hop1_accounts = []
+    for ent_type, ent_value, others in _shared_entities(account_id):
+        result["hop1"].append({"type": ent_type, "value": ent_value, "accounts": others})
+        hop1_accounts.extend(a for a in others if a not in hop1_accounts)
+
+    # 2. Hop 2: other identifiers shared by hop-1 accounts that reach new accounts
+    seen = {account_id, *hop1_accounts}
+    hop1_values = {e["value"] for e in result["hop1"]}
+    for via in hop1_accounts:
+        for ent_type, ent_value, others in _shared_entities(via):
+            new_accts = [a for a in others if a not in seen]
+            if ent_value not in hop1_values and new_accts:
+                result["hop2"].append({"via": via, "type": ent_type, "value": ent_value, "accounts": new_accts})
+                seen.update(new_accts)
+
+    # 3. Seed funders: small inbound transfers from outside accounts into 2+ network accounts
+    tx_df = ctx["transactions_df"]
+    accounts_df = ctx.get("accounts_df")
+    known_accounts = set(accounts_df["account_id"]) if accounts_df is not None else set()
+    seeds = tx_df[
+        tx_df["to_account"].isin(seen)
+        & ~tx_df["from_account"].isin(seen)
+        & tx_df["from_account"].isin(known_accounts)
+        & (tx_df["amount"] <= seed_max_amount)
+    ]
+    for sender, grp in seeds.groupby("from_account"):
+        targets = sorted(grp["to_account"].unique())
+        if len(targets) >= 2:
+            result["seed_funders"].append({
+                "account": sender,
+                "targets": targets,
+                "total": float(grp["amount"].sum()),
+                "first_dt": grp["dt"].min(),
+            })
+
+    return result
