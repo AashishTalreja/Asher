@@ -6,7 +6,7 @@
 |---|---|---|
 | Language | Python 3.11 | Backend + CLI |
 | Data | pandas, numpy | Feature engineering |
-| ML | XGBoost, scikit-learn | Risk scoring |
+| ML | scikit-learn RandomForest | Risk scoring |
 | Graph | networkx | Trail, Louvain, centrality |
 | NLP/ER | re, rapidfuzz, jellyfish | Entity resolution |
 | TUI | rich, prompt_toolkit | Terminal screens |
@@ -22,7 +22,6 @@
 pandas>=2.0
 numpy>=1.24
 scikit-learn>=1.3
-xgboost>=2.0
 networkx>=3.1
 rapidfuzz>=3.0
 jellyfish>=1.0
@@ -110,7 +109,7 @@ def deviation(account_id: str, as_of: datetime, ctx: dict) -> dict:
 
 ```python
 def train(txns: pd.DataFrame, labels: pd.Series) -> None:
-    """Trains and saves model to models/xgb.pkl"""
+    """Trains and saves model to models/rf.pkl"""
 
 def predict(account_id: str, ctx: dict) -> dict:
     """

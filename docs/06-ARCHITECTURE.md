@@ -14,7 +14,7 @@
 │                                                               │
 │  ┌────────────┐  ┌────────────┐  ┌─────────────┐  ┌────────┐ │
 │  │  rules.py  │  │baseline.py │  │    ml.py    │  │fusion. │ │
-│  │ 12 RBI     │  │ 90d rolling│  │ XGBoost     │  │py      │ │
+│  │ 12 RBI     │  │ 90d rolling│  │ RandomForest│  │py      │ │
 │  │ flags      │  │ z-scores   │  │ features    │  │weights │ │
 │  └─────┬──────┘  └─────┬──────┘  └──────┬──────┘  └───┬────┘ │
 │        └────────────────┴────────────────┴─────────────┘      │
@@ -56,7 +56,7 @@
 |---|---|---|
 | `core/rules.py` | 12 RBI red-flag rules; returns fired + evidence | 120 |
 | `core/baseline.py` | 90-day rolling baseline; z-score deviation | 150 |
-| `core/ml.py` | XGBoost training + inference; feature extraction | 200 |
+| `core/ml.py` | RandomForest training + inference; feature extraction | 200 |
 | `core/complaints.py` | Regex + fuzzy entity resolution; incident clustering | 220 |
 | `core/graph_ops.py` | 5-hop BFS + chain classifier + Louvain | 200 |
 | `core/fusion.py` | Weighted score + event log | 100 |

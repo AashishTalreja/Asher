@@ -58,7 +58,7 @@ deviation_score = sigmoid(
 
 **File:** `core/ml.py`
 
-XGBoost binary classifier. **No SHAP** — uses `feature_importances_` for global + top-3 rule contributions for per-alert explanation.
+Class-balanced RandomForest binary classifier. **No SHAP** — uses `feature_importances_` for global + top-3 rule contributions for per-alert explanation.
 
 ### Feature Set
 
@@ -77,11 +77,12 @@ graph:         degree, degree_centrality, avg_neighbor_risk   ← replaces GNN
 ### Training
 
 ```python
-model = xgb.XGBClassifier(
+model = RandomForestClassifier(
     n_estimators=300,
     max_depth=5,
-    scale_pos_weight=neg / pos,
-    eval_metric='auc',
+    max_features='sqrt',
+    class_weight='balanced',
+    random_state=42,
 )
 model.fit(X_train, y_train)
 ```

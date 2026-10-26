@@ -318,11 +318,11 @@ FIXED_COMPLAINTS = [
         "victim_account": "ACC-5514",
         "beneficiary_upi": "rahul***@ybl",
         "beneficiary_name": "R Kumar",
-        "amount": 80000.00,
+        "amount": 77850.00,
         "complaint_date": "2026-10-25",
         "district": "Nalanda",
         "fraud_type": "INVESTMENT",
-        "text": "Telegram VIP trading group: ₹80000 paid to beneficiary rahul***@ybl for double returns.",
+        "text": "Telegram VIP trading group: ₹77850 paid to beneficiary rahul***@ybl for double returns.",
     },
     {
         "complaint_id": "NCRP-2026-3817",
@@ -578,7 +578,7 @@ def generate_background_accounts(n_accounts: int = 500, seed: int = 42, start_id
     return accounts
 
 
-def generate_ring_transactions(base_time: datetime) -> list[dict]:
+def generate_ring_transactions(base_time: datetime, seed: int = 42) -> list[dict]:
     """
     Generate transactions for the 12-account ring:
     1. Historical 90-day baseline for ACC-22451 (2 txns/day @ ~₹500).
@@ -588,6 +588,7 @@ def generate_ring_transactions(base_time: datetime) -> list[dict]:
        ACC-22451 (Patna) -> ACC-10033 (Gaya) -> ACC-99810 (Muzaffarpur) -> ATM Cash-outs
        and parallel branch via ACC-10034 -> ACC-10035 -> ACC-10036 -> ACC-10037.
     """
+    rng = np.random.default_rng(seed)
     txns = []
     txn_counter = 1
 
@@ -597,7 +598,7 @@ def generate_ring_transactions(base_time: datetime) -> list[dict]:
         day_date = base_time - timedelta(days=day_offset)
         # txn 1 (morning)
         t1 = day_date.replace(hour=9, minute=15, second=0)
-        amt1 = round(float(np.random.normal(500, 25)), 2)
+        amt1 = round(float(rng.normal(500, 25)), 2)
         if amt1 < 100:
             amt1 = 500.00
         txns.append({
@@ -613,7 +614,7 @@ def generate_ring_transactions(base_time: datetime) -> list[dict]:
 
         # txn 2 (evening)
         t2 = day_date.replace(hour=18, minute=45, second=0)
-        amt2 = round(float(np.random.normal(500, 25)), 2)
+        amt2 = round(float(rng.normal(500, 25)), 2)
         if amt2 < 100:
             amt2 = 500.00
         txns.append({
@@ -963,7 +964,7 @@ def generate_fixed_case(
     accounts_df_csv = accounts_df[schema_accounts_cols].copy()
 
     # 2. Transactions
-    ring_txns = generate_ring_transactions(base_time=base_time)
+    ring_txns = generate_ring_transactions(base_time=base_time, seed=seed)
     bg_txns = generate_background_transactions(
         bg_accounts=bg_accounts,
         target_count=5000 - len(ring_txns),

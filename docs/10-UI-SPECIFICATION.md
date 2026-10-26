@@ -62,7 +62,7 @@
 │ Layer contributions (weighted fusion):                  │
 │   Rules engine  ██████████████████  1.00  20.0/20 pts   │
 │   Baseline      ██████████████████  1.00  20.0/20 pts   │
-│   ML model      ██████████████████  1.00  34.9/35 pts   │
+│   ML model      ██████████████████  1.00  35.0/35 pts   │
 │   Complaints    ██████████████████  1.00  15.0/15 pts   │
 │   Graph / Ring  ██████████████████  1.00  10.0/10 pts   │
 ├─────────────────────────────────────────────────────────┤
@@ -76,7 +76,7 @@
 │   Normal: 2.0 txn/day @ INR 502 · Today: 58 txns        │
 │   ~29x normal daily frequency                           │
 ├─────────────────────────────────────────────────────────┤
-│ Linked complaints: 6  (INR 4.1L total, 2 districts)     │
+│ Linked complaints: 7  (INR 4.9L total, 2 districts)     │
 │ [T] Trail  [N] Network  [C] Complaints  [E] Export      │
 ╰─────────────────────────────────────────────────────────╯
 ```

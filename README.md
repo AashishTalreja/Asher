@@ -25,7 +25,7 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
 **CHAKRAVYUH** reduces investigation latency from **3 weeks to under 90 seconds** by uniting:
 1. **12 RBI Red-Flag Rules** (instant velocity & structuring detection)
 2. **90-Day Per-Account Baseline Deviation** (individual anomaly $z$-scores)
-3. **20-Feature XGBoost ML Scorer** (supervised mule classification)
+3. **20-Feature Random Forest ML Scorer** (supervised mule classification)
 4. **4-Step RapidFuzz NCRP Correlator** (free-text NLP complaint matching)
 5. **NetworkX 5-Hop BFS & Louvain Clustering** (automated money trail & mule ring tracing)
 6. **Bharatiya Sakshya Adhiniyam (BSA) §63 PDF Exporter** (SHA-256 sealed court evidence)
@@ -52,7 +52,7 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
    │          90-day per-account rolling z-scores (σ jumps)      │
    │                                                             │
    │ Layer 3: ML Risk Scorer (core/ml.py)                        │
-   │          20-feature XGBoost model (velocity, flow, graph)   │
+   │          20-feature Random Forest (velocity, flow, graph)   │
    │                                                             │
    │ Layer 4: Complaint Correlator (core/complaints.py)          │
    │          4-step RapidFuzz entity extraction & clustering    │
@@ -102,8 +102,8 @@ $$\text{deviation\_score} = \sigma\Big(0.3 \cdot z_{\text{amt}} + 0.3 \cdot z_{\
 * **Cold-Start Safeguard**: Accounts $< 90$ days old or with $< 20$ historical transactions automatically fall back to population benchmarks and return `confidence: 'low'`.
 
 ### 3. Layer 3 — ML Risk Scorer (`core/ml.py` · Weight: 0.35)
-* **Model**: Supervised `xgboost.XGBClassifier(n_estimators=100, max_depth=5, scale_pos_weight=neg/pos)`.
-* **Fallback**: Automatic fallback to `sklearn.ensemble.RandomForestClassifier` if native XGBoost libraries are missing on the target host.
+* **Model**: Supervised `sklearn.ensemble.RandomForestClassifier(n_estimators=300, max_depth=5, max_features="sqrt", class_weight="balanced")`, saved to `models/rf.pkl`.
+* **Explanations**: Per-account top features are ranked by model importance × |z-score| of the account's value against all accounts.
 * **20 Features**: Velocity (1h, 24h, 7d), flow ratios, structuring counters, KYC completeness, shared device/phone counts, night transaction percentage, degree centrality, and graph neighborhood risk (`avg_neighbor_risk`).
 
 ### 4. Layer 4 — Complaint Correlator (`core/complaints.py` · Weight: 0.15)
@@ -144,7 +144,7 @@ Built with `rich` and `prompt_toolkit`. Capped at 100 columns for hackathon proj
 ┌────────────────────────── LAYER CONTRIBUTIONS (EXACT WEIGHTED FUSION) ───────────────────────────┐
 │  Layer 1: Rules Engine   ■■■■■■■■■■■■■■■■■■  1.0000                 20.0 / 20.0 pts              │
 │  Layer 2: Baseline Dev   ■■■■■■■■■■■■■■■■■■  1.0000                 20.0 / 20.0 pts              │
-│  Layer 3: ML Scorer      ■■■■■■■■■■■■■■■■■■  0.9983                 34.9 / 35.0 pts              │
+│  Layer 3: ML Scorer      ■■■■■■■■■■■■■■■■■■  1.0000                 35.0 / 35.0 pts              │
 │  Layer 4: Complaints     ■■■■■■■■■■■■■■■■■■  1.0000                 15.0 / 15.0 pts              │
 │  Layer 5: Graph / Ring   ■■■■■■■■■■■■■■■■■■  1.0000                 10.0 / 10.0 pts              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
@@ -161,7 +161,7 @@ Built with `rich` and `prompt_toolkit`. Capped at 100 columns for hackathon proj
 │   Behavioral Flags:    Novel Counterparties: DETECTED · Dormancy Break: CONFIRMED                │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────── LINKED NCRP INCIDENTS (LAYER 4) ─────────────────────────────────┐
-│   Linked NCRP Complaints: 7 cases | Total: INR 490,000.00 | Districts: Patna, Nalanda            │
+│   Linked NCRP Complaints: 7 cases | Total: INR 487,850.00 | Districts: Patna, Nalanda            │
 │   Primary Fraud Modus: JOB_FRAUD, INVESTMENT, UPI_FRAUD, LOAN_APP                                │
 │   Latest Incident (NCRP-2026-3812): "₹5000 bheja, rahul***@ybl ko job ke liye, fir 42000 aur...   │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘

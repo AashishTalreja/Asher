@@ -44,6 +44,7 @@ except ImportError:
     HAS_PROMPT_TOOLKIT = False
 
 from core import fusion
+from core import graph_ops
 from core import report
 from core.baseline import format_deviation
 from core.config import FUSION_WEIGHTS
@@ -261,7 +262,6 @@ class CLIApp:
         box_style = box.ASCII if self.fallback else box.ROUNDED
 
         accounts_df = self.ctx["accounts_df"]
-        complaints_df = self.ctx["complaints_df"]
         transactions_df = self.ctx["transactions_df"]
 
         ring_candidates = [
@@ -275,7 +275,7 @@ class CLIApp:
             score = res["score"]
             meta = accounts_df[accounts_df["account_id"] == acct_id].iloc[0]
             inflow = transactions_df[transactions_df["to_account"] == acct_id]["amount"].sum()
-            cmps = len(complaints_df[complaints_df["beneficiary_name"].str.contains(meta["holder_name"].split()[0], case=False, na=False)])
+            cmps = len(res.get("complaint_details", []))
 
             # Formula from docs/10-UI-SPECIFICATION.md:
             # lead_score = risk * log(1 + amount_at_risk) * (1 + 0.2 * complaint_count)
@@ -346,7 +346,6 @@ class CLIApp:
         """
         box_style = box.ASCII if self.fallback else box.ROUNDED
         accounts_df = self.ctx["accounts_df"]
-        complaints_df = self.ctx["complaints_df"]
 
         # 1. Execute Core Fusion Evaluation
         res = fusion.evaluate_account(account_id, ctx=self.ctx)
@@ -494,7 +493,8 @@ class CLIApp:
         # Layout Section 5: Linked Complaints
         # -------------------------------------------------------------------
         first_token = holder.split()[0]
-        linked_cmps = complaints_df[complaints_df["beneficiary_name"].str.contains(first_token, case=False, na=False)]
+        # Same 4-step correlator output the fusion score (and PDF export) uses
+        linked_cmps = pd.DataFrame(res.get("complaint_details", []))
         cmp_text = Text()
         if len(linked_cmps) > 0:
             tot_amt = linked_cmps["amount"].sum()
@@ -502,10 +502,49 @@ class CLIApp:
             types = ", ".join(linked_cmps["fraud_type"].unique())
             cmp_text.append(f"  Linked NCRP Complaints: {len(linked_cmps)} cases | Total: INR {tot_amt:,.2f} | Districts: {dists}\n", style="bold red" if not self.fallback else "bold")
             cmp_text.append(f"  Primary Fraud Modus: {types}\n", style="dim")
-            sample = linked_cmps.iloc[0]
+            sample = linked_cmps.sort_values("complaint_date", ascending=False, kind="stable").iloc[0]
             cmp_text.append(f"  Latest Incident ({sample['complaint_id']}): \"{sample['text']}\"", style="italic")
         else:
             cmp_text.append("  Zero direct NCRP complaints linked to this account ID.", style="green" if not self.fallback else "")
+
+        # -------------------------------------------------------------------
+        # Layout Section 6: ML Insights (only features the model actually weights)
+        # -------------------------------------------------------------------
+        ml_details = res.get("ml_details", {})
+        feat_vals = ml_details.get("feature_values", {})
+        weighted = [(name, imp) for name, imp in ml_details.get("top_features", []) if imp > 0][:3]
+        ml_text = Text()
+        ml_text.append(f"  Random Forest fraud probability: {ml_details.get('score', 0.0):.4f}\n")
+        if weighted:
+            for i, (name, imp) in enumerate(weighted, 1):
+                val = feat_vals.get(name, 0.0)
+                val_str = f"{val:,.0f}" if float(val).is_integer() else f"{val:,.2f}"
+                ml_text.append(f"  {i}. {name} = {val_str}  (model importance {imp:.0%})\n", style="" if self.fallback else "bold")
+            if len(weighted) < 3:
+                ml_text.append("  Other features carry 0% importance in the trained model.", style="dim")
+        else:
+            ml_text.append("  No feature importances available for this model.", style="dim")
+
+        # -------------------------------------------------------------------
+        # Layout Section 7: Graph Insights (shared identifiers, community, trail)
+        # -------------------------------------------------------------------
+        graph_details = res.get("graph_details", {})
+        net = graph_ops.shared_network(account_id, ctx=self.ctx)
+        community = next((r for r in graph_ops.rings(self.ctx) if account_id in r["accounts"]), None)
+        graph_text = Text()
+        for ent in net["hop1"]:
+            graph_text.append(f"  Part of a {len(ent['accounts']) + 1}-account cluster via {ent['type']} {ent['value']}\n")
+        if not net["hop1"]:
+            graph_text.append("  No phone or device shared with other accounts.\n")
+        if community:
+            graph_text.append(
+                f"  Transaction community #{community['community_id']}: {community['size']} accounts · "
+                f"{community['ring_type']} (suspicion {community['suspicion_score']:.2f})\n"
+            )
+        graph_text.append(
+            f"  Money trail: {graph_details.get('chain_type', 'UNKNOWN')} · {graph_details.get('hop_count', 0)} hops"
+            + (f" · cash-out at {', '.join(graph_details['cash_out_points'])}" if graph_details.get("cash_out_points") else "")
+        )
 
         # -------------------------------------------------------------------
         # Assemble Unified Hero Screen Panel
@@ -518,12 +557,17 @@ class CLIApp:
         p_rules = Panel(rules_text, title="FIRED RBI/FIU-IND INDICATORS (LAYER 1)", box=box_style, border_style="red" if not self.fallback else "white")
         p_baseline = Panel(base_text, title="90-DAY BASELINE DEVIATION (LAYER 2)", box=box_style, border_style="yellow" if not self.fallback else "white")
         p_complaints = Panel(cmp_text, title="LINKED NCRP INCIDENTS (LAYER 4)", box=box_style, border_style="magenta" if not self.fallback else "white")
+        ml_text.rstrip()
+        p_ml = Panel(ml_text, title="ML INSIGHTS (LAYER 3)", box=box_style, border_style="blue" if not self.fallback else "white")
+        p_graph = Panel(graph_text, title="GRAPH INSIGHTS (LAYER 5)", box=box_style, border_style="green" if not self.fallback else "white")
 
         self.console.print(p_header)
         self.console.print(p_contrib)
         self.console.print(p_rules)
         self.console.print(p_baseline)
         self.console.print(p_complaints)
+        self.console.print(p_ml)
+        self.console.print(p_graph)
 
         # Action shortcuts
         self.console.print("\nShortcuts: [T] Money Trail  [N] Network  [C] Complaints  [E] Export PDF  [Enter] Main Menu")
@@ -612,32 +656,58 @@ SHARED ENTITY DISCOVERY:   All 3 mules share phone +91-9812345678 & device DEV-a
     # Screen 5: Network Explorer
     # =======================================================================
     def screen_network_explorer(self, account_id: str = "ACC-22451") -> None:
-        """Render shared entity syndicate tree."""
+        """Render the 2-hop shared entity tree with live fusion risk scores for every node."""
         box_style = box.ASCII if self.fallback else box.ROUNDED
         self.console.clear()
         self.console.print("\n")
 
+        accounts_df = self.ctx["accounts_df"]
+        net = graph_ops.shared_network(account_id, ctx=self.ctx)
+
+        scores = {}
+
+        def node(acct: str) -> str:
+            """'ACC-10033 (Gaya) · Risk 84.3 [CRITICAL]' using the same fusion score as Account 360."""
+            if acct not in scores:
+                res = fusion.evaluate_account(acct, ctx=self.ctx)
+                scores[acct] = f"Risk {res['score']:.1f} [{res['tier']}]"
+            rows = accounts_df[accounts_df["account_id"] == acct]
+            district = rows.iloc[0]["district"] if len(rows) > 0 else "Unknown"
+            return f"{acct} ({district}) · {scores[acct]}"
+
+        head_style = "" if self.fallback else "bold white"
+        ent_style = "" if self.fallback else "yellow"
+        acct_style = "" if self.fallback else "cyan"
+        warn_style = "" if self.fallback else "bold red"
+
         tree_text = Text()
-        tree_text.append(f"""
-                      +-------------------+
-                      | ACC-22451 (Patna) |  <-- INFLOW HUB (Risk 91)
-                      +---------+---------+
-                                |
-             +------------------+------------------+
-             |                                     |
-    [Shared Device DEV-a8f3e2]            [Shared Phone +91-9812345678]
-             |                                     |
-    +--------+--------+                   +--------+--------+
-    |                 |                   |                 |
-ACC-10033 (Gaya)   ACC-99810 (MZR)     ACC-10033 (Gaya)   ACC-99810 (MZR)
- (Risk 78)          (Risk 68)           (Risk 78)          (Risk 68)
-    |
-ACC-10034 (Patna)
- (Risk 72)
-    |
-    v
-ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
-""")
+        tree_text.append(f"\n{node(account_id)}  <-- SELECTED ACCOUNT\n\n", style="bold" if self.fallback else "bold red")
+
+        tree_text.append("HOP 1 · SHARED IDENTIFIERS\n", style=head_style)
+        if not net["hop1"]:
+            tree_text.append("  No phone or device shared with other accounts.\n")
+        for ent in net["hop1"]:
+            tree_text.append(f"  [Shared {ent['type'].title()} {ent['value']}]\n", style=ent_style)
+            for acct in ent["accounts"]:
+                tree_text.append(f"     +-- {node(acct)}\n", style=acct_style)
+
+        if net["hop2"]:
+            tree_text.append("\nHOP 2 · LINKED THROUGH HOP-1 ACCOUNTS\n", style=head_style)
+            for ent in net["hop2"]:
+                tree_text.append(f"  {ent['via']} --[Shared {ent['type'].title()} {ent['value']}]\n", style=ent_style)
+                for acct in ent["accounts"]:
+                    tree_text.append(f"     +-- {node(acct)}\n", style=acct_style)
+
+        if net["seed_funders"]:
+            as_of = self.ctx.get("as_of")
+            tree_text.append("\nSEED FUNDERS · small transfers into 2+ accounts above (possible recruiters)\n", style=head_style)
+            for seed in net["seed_funders"]:
+                days = f", {(as_of - seed['first_dt']).days}d before latest data" if as_of is not None else ""
+                tree_text.append(f"  {node(seed['account'])}\n", style=warn_style)
+                tree_text.append(
+                    f"     sent INR {seed['total']:,.0f} to {', '.join(seed['targets'])} "
+                    f"(first: {seed['first_dt']:%Y-%m-%d}{days})\n"
+                )
 
         panel = Panel(
             tree_text,

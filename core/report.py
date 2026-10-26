@@ -368,7 +368,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
         ["Detection Layer", "Statutory Target", "Raw Score (0-1)", "Weighting", "Contribution"],
         ["Layer 1: Rules Engine", "12 RBI/FIU-IND Indicators", f"{contributions['rule']:.4f}", "20%", f"{0.20 * contributions['rule'] * 100:.1f} pts"],
         ["Layer 2: Baseline Deviation", "90-Day Rolling Z-Score Anomaly", f"{contributions['baseline']:.4f}", "20%", f"{0.20 * contributions['baseline'] * 100:.1f} pts"],
-        ["Layer 3: ML Risk Scorer", "20-Feature XGBoost Classifier", f"{contributions['ml']:.4f}", "35%", f"{0.35 * contributions['ml'] * 100:.1f} pts"],
+        ["Layer 3: ML Risk Scorer", "20-Feature Random Forest", f"{contributions['ml']:.4f}", "35%", f"{0.35 * contributions['ml'] * 100:.1f} pts"],
         ["Layer 4: Complaint Correlator", "4-Step RapidFuzz NCRP Match", f"{contributions['complaint']:.4f}", "15%", f"{0.15 * contributions['complaint'] * 100:.1f} pts"],
         ["Layer 5: Graph / Ring", "Louvain Mule Ring & 5-Hop BFS", f"{contributions['graph']:.4f}", "10%", f"{0.10 * contributions['graph'] * 100:.1f} pts"],
         ["<b>TOTAL COMPOSITE</b>", "<b>Weighted Fusion Formula</b>", "<b>1.0000</b>", "<b>100%</b>", f"<b>{score:.1f} / 100 pts</b>"],
@@ -467,7 +467,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
 
     top_feat_str = ", ".join([f"<b>{name}</b> (importance: {wt:.2f})" for name, wt in ml_top[:4]])
     ml_summary = (
-        f"XGBoost Gradient Boosted Classifier (20 engineered features) estimated a mule fraud probability of "
+        f"Class-balanced Random Forest classifier (20 engineered features) estimated a mule fraud probability of "
         f"<b>{ml_prob * 100:.1f}%</b>. Leading predictive features: {top_feat_str}."
     )
     story.append(Paragraph(ml_summary, body_style))

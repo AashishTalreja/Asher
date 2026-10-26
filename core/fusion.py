@@ -7,12 +7,12 @@ Fuses signals from all 5 detection layers into a unified 0-100 risk score:
 All 5 detection layers are fully operational:
 - Layer 1: Rules Engine (core.rules) - 12 RBI Red-Flag violations
 - Layer 2: Baseline Deviation (core.baseline) - 90-day per-account z-score anomaly detector
-- Layer 3: ML Risk Scorer (core.ml) - 20-feature XGBoost/RandomForest model
+- Layer 3: ML Risk Scorer (core.ml) - 20-feature class-balanced RandomForest
 - Layer 4: Complaint Correlator (core.complaints) - 4-step RapidFuzz NCRP correlation
 - Layer 5: Graph Operations (core.graph_ops) - 5-hop BFS & Louvain community detection
 
 Produces:
-- score: float (0.0 to 100.0)
+- score: float (0.0 to 99.9, capped)
 - tier: 'CRITICAL' (>= 80) | 'HIGH' (>= 60) | 'MEDIUM' (>= 40) | 'LOW' (< 40)
 - contributions: breakdown of each layer's score (0.0 to 1.0)
 - confidence: 'normal' | 'low' (tracks cold-start accounts with < 90 days age or < 20 txns)
@@ -29,6 +29,9 @@ from core import baseline
 from core import ml
 from core import complaints
 from core import graph_ops
+
+
+MAX_SCORE = 99.9
 
 
 def tier_of(final_score: float) -> str:
@@ -84,7 +87,7 @@ def score(account_id: str, ctx: dict = None) -> dict:
     baseline_score = float(baseline_res.get("score", 0.0))
     base_conf = baseline_res.get("confidence", "normal")
 
-    # 3. Layer 3: ML Risk Scorer (XGBoost / RandomForest 20-feature model)
+    # 3. Layer 3: ML Risk Scorer (20-feature RandomForest)
     ml_res = ml.predict(account_id, ctx=ctx)
     if isinstance(ml_res, dict):
         ml_score = float(ml_res.get("score", 0.0))
@@ -117,8 +120,8 @@ def score(account_id: str, ctx: dict = None) -> dict:
     # Score = 0.20(Rules) + 0.20(Baseline) + 0.35(ML) + 0.15(Complaint) + 0.10(Graph)
     raw_score = sum(FUSION_WEIGHTS[layer] * contributions[layer] for layer in FUSION_WEIGHTS)
 
-    # Scale to 0 - 100
-    final_score = round(raw_score * 100.0, 1)
+    # Scale to 0 - 100, capped at MAX_SCORE so a saturated account never reads as a perfect 100
+    final_score = min(MAX_SCORE, round(raw_score * 100.0, 1))
     tier = tier_of(final_score)
 
     # Construct comprehensive multi-layer explanation
