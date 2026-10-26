@@ -392,16 +392,16 @@ class CLIApp:
         header_text = Text()
         if self.fallback:
             header_text.append(f"ACCOUNT 360: {account_id} | RISK SCORE: {score}/100 [{tier}]\n", style="bold")
-            header_text.append(f"Holder: {holder} | Age: {age_days}d | District: {district} | Bank: {bank} ({branch})\n")
+            header_text.append(f"Holder: {holder} | Account Age: {age_days} days | District: {district} | Bank: {bank} ({branch})\n")
             header_text.append(f"Phone: {phone} | Device: {device_id} | KYC: {kyc} | Confidence: {confidence.upper()}\n")
             header_text.append(f"Score Trajectory: {trajectory}")
         else:
             header_text.append(f"ACCOUNT 360 · {account_id} · ", style="bold white")
             header_text.append(f"RISK {score:.1f} ", style=tier_style)
             header_text.append(f"[{tier}]\n", style=tier_style)
-            header_text.append(f"Holder: [bold]{holder}[/] · Age: {age_days}d · District: [cyan]{district}[/] · Bank: {bank} ({branch})\n", style="white")
-            header_text.append(f"Phone: [cyan]{phone}[/] · Device: [yellow]{device_id}[/] · KYC: [magenta]{kyc}[/] · Confidence: [bold]{confidence.upper()}[/]\n", style="white")
-            header_text.append(f"Score Trajectory: [dim italic]{trajectory}[/]", style="dim")
+            header_text.append(Text.from_markup(f"Holder: [bold]{holder}[/] · Account Age: {age_days} days · District: [cyan]{district}[/] · Bank: {bank} ({branch})\n", style="white"))
+            header_text.append(Text.from_markup(f"Phone: [cyan]{phone}[/] · Device: [yellow]{device_id}[/] · KYC: [magenta]{kyc}[/] · Confidence: [bold]{confidence.upper()}[/]\n", style="white"))
+            header_text.append(Text.from_markup(f"Score Trajectory: [dim italic]{trajectory}[/]", style="dim"))
 
         # -------------------------------------------------------------------
         # Layout Section 2: Layer Contribution Bars (Weighted Fusion)
@@ -488,8 +488,8 @@ class CLIApp:
             base_text.append("daily transaction frequency spike\n", style="dim")
 
             base_text.append("  Behavioral Indicators: ", style="bold")
-            base_text.append(f"New Counterparties: [bold cyan]{new_cp}[/]  ·  Dormancy Break: [bold red]{dorm_brk}[/]\n")
-            base_text.append(f"  Diagnosis: [italic]{baseline_details.get('explanation', '')}[/]", style="dim white")
+            base_text.append(Text.from_markup(f"New Counterparties: [bold cyan]{new_cp}[/]  ·  Dormancy Break: [bold red]{dorm_brk}[/]\n"))
+            base_text.append(Text.from_markup(f"  Diagnosis: [italic]{baseline_details.get('explanation', '')}[/]", style="dim white"))
 
         # -------------------------------------------------------------------
         # Layout Section 5: Linked Complaints
@@ -809,18 +809,18 @@ ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
             report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.")
         else:
             report_text.append("BHARATIYA SAKSHYA ADHINIYAM (BSA) 2023 · SECTION 63 COMPLIANT DOSSIER\n", style="bold white")
-            report_text.append(f"  Target Account:      [bold cyan]{account_id}[/] ({holder}, [cyan]{district}[/])\n")
-            report_text.append(f"  Case Reference:      [bold yellow]{case_ref}[/]\n")
+            report_text.append(Text.from_markup(f"  Target Account:      [bold cyan]{account_id}[/] ({holder}, [cyan]{district}[/])\n"))
+            report_text.append(Text.from_markup(f"  Case Reference:      [bold yellow]{case_ref}[/]\n"))
             report_text.append(f"  Export Timestamp:    {gen_time}\n")
-            report_text.append(f"  SHA-256 PDF Hash:    [bold green]{pdf_sha256}[/]\n")
-            report_text.append(f"  Payload Seal Hash:   [dim]{payload_hash}[/]\n")
-            report_text.append(f"  Destination Path:    [bold underline]{pdf_path}[/]\n\n")
+            report_text.append(Text.from_markup(f"  SHA-256 PDF Hash:    [bold green]{pdf_sha256}[/]\n"))
+            report_text.append(Text.from_markup(f"  Payload Seal Hash:   [dim]{payload_hash}[/]\n"))
+            report_text.append(Text.from_markup(f"  Destination Path:    [bold underline]{pdf_path}[/]\n\n"))
             report_text.append("Dossier Evidentiary Summary:\n", style="bold white")
-            report_text.append(f"  - Fused Risk Score:  [bold red]{score:.1f} / 100.0[/] [{tier}]\n")
-            report_text.append(f"  - Core RBI Rules:    [red]{len(fired_rules)} Rules Fired[/] ({fired_names})\n")
-            report_text.append(f"  - Baseline Jump:     [yellow]{z_amt:.1f} sigma[/] deviation above 90-day normal\n")
-            report_text.append(f"  - Layering Trail:    [magenta]{chain_type}[/] ({hop_count} hops)\n")
-            report_text.append(f"  - Linked NCRP Cases: [bold red]{len(complaint_details)} verified incidents[/]\n\n")
+            report_text.append(Text.from_markup(f"  - Fused Risk Score:  [bold red]{score:.1f} / 100.0[/] [{tier}]\n"))
+            report_text.append(Text.from_markup(f"  - Core RBI Rules:    [red]{len(fired_rules)} Rules Fired[/] ({fired_names})\n"))
+            report_text.append(Text.from_markup(f"  - Baseline Jump:     [yellow]{z_amt:.1f} sigma[/] deviation above 90-day normal\n"))
+            report_text.append(Text.from_markup(f"  - Layering Trail:    [magenta]{chain_type}[/] ({hop_count} hops)\n"))
+            report_text.append(Text.from_markup(f"  - Linked NCRP Cases: [bold red]{len(complaint_details)} verified incidents[/]\n\n"))
             report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.", style="bold green")
 
         panel = Panel(

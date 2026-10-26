@@ -323,7 +323,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
             Paragraph("<b>Registered IP Address:</b>", body_style),
             Paragraph(ip_addr, body_style),
             Paragraph("<b>KYC Compliance Status:</b>", body_style),
-            Paragraph(f"<b>{kyc_status}</b> (Age: {age_days} days)", body_style),
+            Paragraph(f"<b>{kyc_status}</b> (Account Age: {age_days} days)", body_style),
         ],
     ]
     meta_table = Table(meta_table_data, colWidths=[110, 150, 110, 145])
@@ -442,7 +442,7 @@ def generate_pdf(account_id: str, ctx: dict = None, out_path: str = None) -> dic
             Paragraph("<b>Forensic Diagnosis:</b>", body_style),
             Paragraph(f"<i>{diagnosis}</i>", body_style),
             Paragraph("<b>Cold-Start Status:</b>", body_style),
-            Paragraph(f"{confidence.upper()} (Account Age: {age_days}d)", body_style),
+            Paragraph(f"{confidence.upper()} (Account Age: {age_days} days)", body_style),
         ]
     ]
     base_table = Table(base_summary_data, colWidths=[120, 140, 110, 145])
