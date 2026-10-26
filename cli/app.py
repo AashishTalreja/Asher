@@ -45,6 +45,7 @@ except ImportError:
 
 from core import fusion
 from core import report
+from core.baseline import format_deviation
 from core.config import FUSION_WEIGHTS
 
 
@@ -339,7 +340,7 @@ class CLIApp:
         Calls core.fusion.evaluate_account() and renders:
         - Fused risk score & tier badge
         - Layer contribution bars
-        - Fired RBI red-flag rules with concrete evidence
+        - Fired RBI/FIU-IND Indicators with concrete evidence
         - 90-day baseline deviation z-scores
         - Linked NCRP complaints
         """
@@ -378,9 +379,7 @@ class CLIApp:
             device_id = "DEV-XXXXXX"
             kyc = "PENDING"
 
-        trajectory = "34 -> 78 -> 91 (in 6 hours) | Trigger: Rapid inflow + Structuring"
-        if score < 40:
-            trajectory = "12 -> 18 -> 24 (steady baseline, no abnormal spikes)"
+        data_quality = "OK" if confidence == "normal" else "LIMITED (cold-start)"
 
         tier_style = "bold red" if tier in ["CRITICAL", "HIGH"] else "bold green"
         if self.fallback:
@@ -393,15 +392,13 @@ class CLIApp:
         if self.fallback:
             header_text.append(f"ACCOUNT 360: {account_id} | RISK SCORE: {score}/100 [{tier}]\n", style="bold")
             header_text.append(f"Holder: {holder} | Account Age: {age_days} days | District: {district} | Bank: {bank} ({branch})\n")
-            header_text.append(f"Phone: {phone} | Device: {device_id} | KYC: {kyc} | Confidence: {confidence.upper()}\n")
-            header_text.append(f"Score Trajectory: {trajectory}")
+            header_text.append(f"Phone: {phone} | Device: {device_id} | KYC: {kyc} | Data Quality: {data_quality}")
         else:
             header_text.append(f"ACCOUNT 360 · {account_id} · ", style="bold white")
             header_text.append(f"RISK {score:.1f} ", style=tier_style)
             header_text.append(f"[{tier}]\n", style=tier_style)
             header_text.append(Text.from_markup(f"Holder: [bold]{holder}[/] · Account Age: {age_days} days · District: [cyan]{district}[/] · Bank: {bank} ({branch})\n", style="white"))
-            header_text.append(Text.from_markup(f"Phone: [cyan]{phone}[/] · Device: [yellow]{device_id}[/] · KYC: [magenta]{kyc}[/] · Confidence: [bold]{confidence.upper()}[/]\n", style="white"))
-            header_text.append(Text.from_markup(f"Score Trajectory: [dim italic]{trajectory}[/]", style="dim"))
+            header_text.append(Text.from_markup(f"Phone: [cyan]{phone}[/] · Device: [yellow]{device_id}[/] · KYC: [magenta]{kyc}[/] · Data Quality: [bold]{data_quality}[/]", style="white"))
 
         # -------------------------------------------------------------------
         # Layout Section 2: Layer Contribution Bars (Weighted Fusion)
@@ -437,7 +434,7 @@ class CLIApp:
             f"{0.15 * contributions['complaint'] * 100:.1f} / 15.0 pts"
         )
         contrib_table.add_row(
-            "Layer 5: Graph Ring Ops",
+            "Layer 5: Graph / Ring",
             self._render_bar(contributions["graph"], color="green"),
             f"{contributions['graph']:.4f}",
             f"{0.10 * contributions['graph'] * 100:.1f} / 10.0 pts"
@@ -457,11 +454,11 @@ class CLIApp:
                     rules_text.append(f"  [X] {rule_name} (weight: {weight:.2f}) -> {evidence}\n")
                 else:
                     rules_text.append("  [✓] ", style="bold green")
-                    rules_text.append(f"{rule_name:<20}", style="bold red")
+                    rules_text.append(f"{rule_name:<27}", style="bold red")
                     rules_text.append(f" (wt: {weight:.2f}) ", style="dim")
                     rules_text.append(f"-> {evidence}\n", style="white")
         else:
-            rules_text.append("  [None] Clean record. Zero RBI red-flag rules fired.", style="green" if not self.fallback else "")
+            rules_text.append("  [None] Clean record. Zero RBI/FIU-IND Indicators fired.", style="green" if not self.fallback else "")
 
         # -------------------------------------------------------------------
         # Layout Section 4: Baseline Deviation
@@ -470,22 +467,24 @@ class CLIApp:
         z_freq = baseline_details.get("z_freq", 0.0)
         new_cp = baseline_details.get("new_counterparty", False)
         dorm_brk = baseline_details.get("dormancy_break", False)
+        amt_dev = format_deviation(z_amt, baseline_details.get("amt_ratio", 0.0), "amount", "above 90-day normal")
+        freq_dev = format_deviation(z_freq, baseline_details.get("freq_ratio", 0.0), "daily frequency", "daily velocity jump")
 
         base_text = Text()
         if self.fallback:
-            base_text.append(f"  Amount Deviation:      {z_amt:.2f} sigma above 90-day normal\n")
-            base_text.append(f"  Frequency Deviation:   {z_freq:.2f} sigma daily velocity jump\n")
+            base_text.append(f"  Amount Deviation:      {amt_dev}\n")
+            base_text.append(f"  Frequency Deviation:   {freq_dev}\n")
             base_text.append(f"  Novel Counterparties:  {'DETECTED' if new_cp else 'None'}\n")
             base_text.append(f"  Dormancy Break Burst:  {'CONFIRMED' if dorm_brk else 'None'}\n")
             base_text.append(f"  Diagnosis:             {baseline_details.get('explanation', '')}")
         else:
             base_text.append("  Amount Deviation:    ", style="bold")
-            base_text.append(f"{z_amt:.2f} sigma ", style="bold red" if z_amt >= 3 else "green")
-            base_text.append("above account's own 90-day rolling baseline\n", style="dim")
+            base_text.append(f"{amt_dev} ", style="bold red" if z_amt >= 3 else "green")
+            base_text.append("(vs account's own 90-day rolling baseline)\n", style="dim")
 
             base_text.append("  Frequency Jump:      ", style="bold")
-            base_text.append(f"{z_freq:.2f} sigma ", style="bold yellow" if z_freq >= 3 else "green")
-            base_text.append("daily transaction frequency spike\n", style="dim")
+            base_text.append(f"{freq_dev} ", style="bold yellow" if z_freq >= 3 else "green")
+            base_text.append("(daily transaction count)\n", style="dim")
 
             base_text.append("  Behavioral Indicators: ", style="bold")
             base_text.append(Text.from_markup(f"New Counterparties: [bold cyan]{new_cp}[/]  ·  Dormancy Break: [bold red]{dorm_brk}[/]\n"))
@@ -516,7 +515,7 @@ class CLIApp:
 
         p_header = Panel(header_text, box=box_style, border_style="cyan" if not self.fallback else "white")
         p_contrib = Panel(contrib_table, title="LAYER CONTRIBUTIONS (EXACT WEIGHTED FUSION)", box=box_style, border_style="blue" if not self.fallback else "white")
-        p_rules = Panel(rules_text, title="FIRED RBI RED-FLAG RULES (LAYER 1)", box=box_style, border_style="red" if not self.fallback else "white")
+        p_rules = Panel(rules_text, title="FIRED RBI/FIU-IND INDICATORS (LAYER 1)", box=box_style, border_style="red" if not self.fallback else "white")
         p_baseline = Panel(base_text, title="90-DAY BASELINE DEVIATION (LAYER 2)", box=box_style, border_style="yellow" if not self.fallback else "white")
         p_complaints = Panel(cmp_text, title="LINKED NCRP INCIDENTS (LAYER 4)", box=box_style, border_style="magenta" if not self.fallback else "white")
 
@@ -788,6 +787,7 @@ ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
         fired_rules = rule_details.get("fired", [])
         fired_names = ", ".join([f["rule"] for f in fired_rules[:4]]) if fired_rules else "None"
         z_amt = baseline_details.get("z_amt", 0.0)
+        amt_dev = format_deviation(z_amt, baseline_details.get("amt_ratio", 0.0), "amount", "deviation above 90-day normal")
         chain_type = graph_details.get("chain_type", "LAYERING")
         hop_count = graph_details.get("hop_count", 0)
 
@@ -802,8 +802,8 @@ ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
             report_text.append(f"  Destination Path:    {pdf_path}\n\n")
             report_text.append("Dossier Evidentiary Summary:\n", style="bold")
             report_text.append(f"  - Fused Risk Score:  {score:.1f} / 100.0 [{tier}]\n")
-            report_text.append(f"  - Core RBI Rules:    {len(fired_rules)} Rules Fired ({fired_names})\n")
-            report_text.append(f"  - Baseline Jump:     {z_amt:.1f} sigma deviation above 90-day normal\n")
+            report_text.append(f"  - RBI/FIU-IND:       {len(fired_rules)} Indicators Fired ({fired_names})\n")
+            report_text.append(f"  - Baseline Jump:     {amt_dev}\n")
             report_text.append(f"  - Layering Trail:    {chain_type} ({hop_count} hops)\n")
             report_text.append(f"  - Linked NCRP Cases: {len(complaint_details)} complaints verified\n\n")
             report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.")
@@ -817,8 +817,8 @@ ACC-88001 (Patna) <== RECRUITER NODE (Shared DEV-d4e5f6, seed txns sent 45d ago)
             report_text.append(Text.from_markup(f"  Destination Path:    [bold underline]{pdf_path}[/]\n\n"))
             report_text.append("Dossier Evidentiary Summary:\n", style="bold white")
             report_text.append(Text.from_markup(f"  - Fused Risk Score:  [bold red]{score:.1f} / 100.0[/] [{tier}]\n"))
-            report_text.append(Text.from_markup(f"  - Core RBI Rules:    [red]{len(fired_rules)} Rules Fired[/] ({fired_names})\n"))
-            report_text.append(Text.from_markup(f"  - Baseline Jump:     [yellow]{z_amt:.1f} sigma[/] deviation above 90-day normal\n"))
+            report_text.append(Text.from_markup(f"  - RBI/FIU-IND:       [red]{len(fired_rules)} Indicators Fired[/] ({fired_names})\n"))
+            report_text.append(Text.from_markup(f"  - Baseline Jump:     [yellow]{amt_dev}[/]\n"))
             report_text.append(Text.from_markup(f"  - Layering Trail:    [magenta]{chain_type}[/] ({hop_count} hops)\n"))
             report_text.append(Text.from_markup(f"  - Linked NCRP Cases: [bold red]{len(complaint_details)} verified incidents[/]\n\n"))
             report_text.append("[+] Court-admissible electronic certificate and PDF generated successfully.", style="bold green")

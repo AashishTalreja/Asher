@@ -24,6 +24,13 @@ def _sigmoid(x: float) -> float:
     return float(1.0 / (1.0 + np.exp(-np.clip(x, -50.0, 50.0))))
 
 
+def format_deviation(z: float, ratio: float, noun: str, sigma_suffix: str) -> str:
+    """Show extreme z-scores (> 50) as a plain multiplier, e.g. '~32x normal amount'."""
+    if z > 50 and ratio > 0:
+        return f"~{ratio:.0f}x normal {noun}"
+    return f"{z:.2f} sigma {sigma_suffix}"
+
+
 def compute_population_baseline(transactions_df: pd.DataFrame) -> dict:
     """Compute default baseline across population for cold-start accounts."""
     if transactions_df is None or len(transactions_df) == 0:
@@ -170,11 +177,17 @@ def deviation(account_id: str, as_of: datetime = None, ctx: dict = None) -> dict
         z_amt = max(0.0, (curr_amt_mean - amt_mean) / amt_std)
         z_freq = max(0.0, (curr_freq - freq_mean) / freq_std)
 
+        # Plain multipliers vs. baseline (shown instead of sigma when z > 50)
+        amt_ratio = curr_amt_mean / amt_mean if amt_mean > 0 else 0.0
+        freq_ratio = curr_freq / freq_mean if freq_mean > 0 else 0.0
+
         # Dormancy break check: low historical daily volume (< 3 txns/day) and curr_freq > 15
         dormancy_break = (freq_mean <= 3.0 and curr_freq >= 15) or (len(hist_txns) > 0 and len(curr_txns) > 10 and (curr_txns['dt'].min() - hist_txns['dt'].max()).days >= 15)
     else:
         z_amt = 0.0
         z_freq = 0.0
+        amt_ratio = 0.0
+        freq_ratio = 0.0
         new_cp = False
         dormancy_break = False
         geo_anomaly = False
@@ -198,9 +211,13 @@ def deviation(account_id: str, as_of: datetime = None, ctx: dict = None) -> dict
 
     # Build human-readable explanation
     explanations = []
-    if z_amt >= 3.0:
+    if z_amt > 50.0:
+        explanations.append(f"~{amt_ratio:.0f}x normal amount (historical mean: INR {amt_mean:,.0f})")
+    elif z_amt >= 3.0:
         explanations.append(f"{z_amt:.1f} sigma above normal amount (historical mean: INR {amt_mean:,.0f})")
-    if z_freq >= 3.0:
+    if z_freq > 50.0:
+        explanations.append(f"~{freq_ratio:.0f}x normal daily frequency ({len(curr_txns)} txns today vs {freq_mean:.1f} avg)")
+    elif z_freq >= 3.0:
         explanations.append(f"{z_freq:.1f} sigma above normal daily frequency ({len(curr_txns)} txns today vs {freq_mean:.1f} avg)")
     if new_cp:
         explanations.append("new/unseen counterparties in 24h")
@@ -215,6 +232,8 @@ def deviation(account_id: str, as_of: datetime = None, ctx: dict = None) -> dict
         "score": deviation_score,
         "z_amt": round(float(z_amt), 2),
         "z_freq": round(float(z_freq), 2),
+        "amt_ratio": round(float(amt_ratio), 1),
+        "freq_ratio": round(float(freq_ratio), 1),
         "new_counterparty": bool(new_cp),
         "dormancy_break": bool(dormancy_break),
         "confidence": confidence,

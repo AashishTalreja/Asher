@@ -10,15 +10,15 @@ Five layers. Fused into one score. Each layer adds a different kind of signal.
 
 | Rule | Condition |
 |---|---|
-| `rapid_in_out` | in-out gap < 10 min |
+| `rapid_in_out` | outflow of 80-100% of an inflow within 10 min |
 | `high_velocity_24h` | txn_count_24h > 20 |
-| `round_amounts` | amount in {9999, 49999, 99999} or % 5000 == 0 |
+| `structuring_evasion_amounts` | amount in {9999, 49999, 99999} or % 5000 == 0 |
 | `structuring_50k` | count(45K ≤ amt ≤ 50K) > 3 in 24h |
 | `dormancy_burst` | dormant_days > 90 and txn_count_24h > 5 |
 | `new_account_high` | age_days < 90 and sum_24h > 1L |
 | `shared_device_3plus` | accounts sharing device > 3 |
 | `shared_phone_3plus` | accounts sharing phone > 3 |
-| `kyc_recent_change` | days_since_kyc < 30 and sum_24h > 50K |
+| `kyc_minimal_high_turnover` | kyc_status in {MINIMAL, PENDING} and sum_24h > 50K |
 | `no_salary_large_in` | inflow > 5L and no salary pattern |
 | `pass_through_high` | pass_through_ratio_1h > 0.85 |
 | `night_burst` | txn_count_1h > 10 and hour in [0..5] |
@@ -50,7 +50,7 @@ deviation_score = sigmoid(
 )
 ```
 
-**Explanation example:** *"23σ above normal, new counterparty, 3 AM activity."*
+**Explanation example:** *"~32x normal amount (historical mean: INR 502), ~29x normal daily frequency (58 txns today vs 2.0 avg), new/unseen counterparties in 24h."* Z-scores above 50 are shown as a plain multiplier; smaller ones as sigma (e.g. *"4.2 sigma above normal amount"*).
 
 **Cold-start handling:** age < 90 days or < 20 historical txns → fall back to population baseline, mark `confidence='low'`.
 

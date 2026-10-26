@@ -62,8 +62,7 @@
 | `core/fusion.py` | Weighted score + event log | 100 |
 | `core/report.py` | PDF generation + SHA-256 chain | 180 |
 | `data_gen/generator.py` | Fixed ring + background + complaints | 250 |
-| `cli/menu.py` | Main menu + REPL | 120 |
-| `cli/screens/*.py` | 8 screens (~80–120 LOC each) | 700 |
+| `cli/app.py` | Main menu + REPL + 8 screens (`CLIApp.screen_*`) | 820 |
 | **Total** | | **~2240 LOC** |
 
 ## Data Flow

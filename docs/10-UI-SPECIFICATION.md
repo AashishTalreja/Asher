@@ -23,12 +23,12 @@
 
 ## Screen 1 — Live Alert Feed
 
-**File:** `cli/screens/alerts.py`
+**File:** `cli/app.py` (`CLIApp.screen_live_alerts`)
 **Tech:** Rich `Live` replays a pre-generated event queue with `time.sleep()`.
 
 ```
 ╭─ 🔴 LIVE ALERTS · simulated stream ────────────────────╮
-│ 12:34:07  ⚠ CRITICAL  ACC-22451  Risk 91  ₹4.9L  Patna  │
+│ 12:34:07  ⚠ CRITICAL  ACC-22451  Risk 99.9 ₹4.9L  Patna  │
 │ 12:33:45  ⚠ HIGH      ACC-10033  Risk 78  ₹2.1L  Gaya   │
 │ 12:33:12  ✓ RESOLVED  ACC-9981   Risk 45  ₹0.3L  Bhagal │
 ╰─────────────────────────────────────────────────────────╯
@@ -36,7 +36,7 @@
 
 ## Screen 2 — Prioritized Leads
 
-**File:** `cli/screens/leads.py`
+**File:** `cli/app.py` (`CLIApp.screen_prioritized_leads`)
 **Ranking:** `lead_score = risk × log(1+amount_at_risk) × (1+0.2×complaint_count)`
 
 ```
@@ -51,35 +51,39 @@
 
 ## Screen 3 — Account 360 ⭐
 
-**File:** `cli/screens/account.py`
+**File:** `cli/app.py` (`CLIApp.screen_account_360`)
 **Most important screen.** Everything about one account at a glance.
 
 ```
-╭─ ACC-22451 · Risk 91 · CRITICAL ──────────────────────╮
-│ Holder: R. Kumar · Age 47d · Patna · SBI             │
-│ Score trajectory: 34 → 78 → 91 (in 6 hours)          │
-├───────────────────────────────────────────────────────┤
-│ Contributions:                                        │
-│   Rule engine   ████████████████    0.32              │
-│   Baseline      ████████████        0.24              │
-│   ML model      ██████████          0.19              │
-│   Complaints    ████████            0.14              │
-│   Graph         ██████              0.11              │
-├───────────────────────────────────────────────────────┤
-│ Rules fired:  rapid_in_out ✓ dormancy_burst ✓        │
-│               structuring ✓ shared_device ✓          │
-├───────────────────────────────────────────────────────┤
-│ Baseline deviation: 23σ above normal                 │
-│   Normal: 2 txn/day @ ₹500 · Today: 47 @ ₹9,999     │
-├───────────────────────────────────────────────────────┤
-│ Linked complaints: 7  (₹8.7L total, 2 districts)     │
-│ [T] Trace  [N] Network  [C] Complaints  [E] Export   │
-╰───────────────────────────────────────────────────────╯
+╭─ ACC-22451 · Risk 99.9 · CRITICAL ──────────────────────╮
+│ Holder: Rahul Kumar · Account Age: 115 days · Patna     │
+│ KYC: MINIMAL · Data Quality: OK                         │
+├─────────────────────────────────────────────────────────┤
+│ Layer contributions (weighted fusion):                  │
+│   Rules engine  ██████████████████  1.00  20.0/20 pts   │
+│   Baseline      ██████████████████  1.00  20.0/20 pts   │
+│   ML model      ██████████████████  1.00  34.9/35 pts   │
+│   Complaints    ██████████████████  1.00  15.0/15 pts   │
+│   Graph / Ring  ██████████████████  1.00  10.0/10 pts   │
+├─────────────────────────────────────────────────────────┤
+│ RBI/FIU-IND Indicators fired (8):                       │
+│   high_velocity_24h ✓  structuring_evasion_amounts ✓    │
+│   structuring_50k ✓  shared_device_3plus ✓              │
+│   shared_phone_3plus ✓  kyc_minimal_high_turnover ✓     │
+│   no_salary_large_in ✓  pass_through_high ✓             │
+├─────────────────────────────────────────────────────────┤
+│ Baseline deviation: ~32x normal amount                  │
+│   Normal: 2.0 txn/day @ INR 502 · Today: 58 txns        │
+│   ~29x normal daily frequency                           │
+├─────────────────────────────────────────────────────────┤
+│ Linked complaints: 6  (INR 4.1L total, 2 districts)     │
+│ [T] Trail  [N] Network  [C] Complaints  [E] Export      │
+╰─────────────────────────────────────────────────────────╯
 ```
 
 ## Screen 4 — Money Trail Tracer
 
-**File:** `cli/screens/money_trail.py`
+**File:** `cli/app.py` (`CLIApp.screen_money_trail`)
 ASCII Sankey + chain classification.
 
 ```
@@ -103,11 +107,11 @@ Shared entity: All 3 mules share phone +91-98****4321
 
 ## Screen 5 — Network Explorer
 
-**File:** `cli/screens/network.py`
+**File:** `cli/app.py` (`CLIApp.screen_network_explorer`)
 ASCII 2-hop tree + PNG export for complex graphs.
 
 ```
-        ACC-22451 (91) ◀── CENTRAL
+        ACC-22451 (99.9) ◀── CENTRAL
        ╱    │    ╲
     ACC-…  ACC-…  ACC-…     (all risk 70-89, same device)
      (72)   (68)   (81)
@@ -119,7 +123,7 @@ Force-graph PNG saved → reports/network-ACC-22451.png
 
 ## Screen 6 — Complaint Correlator
 
-**File:** `cli/screens/complaints.py`
+**File:** `cli/app.py` (`CLIApp.screen_complaint_correlator`)
 
 ```
 Query: "rahul@ybl"  →  Matched: rahul.kumar@ybl (91%)
@@ -135,7 +139,7 @@ Query: "rahul@ybl"  →  Matched: rahul.kumar@ybl (91%)
 
 ## Screen 7 — District Summary
 
-**File:** `cli/screens/districts.py`
+**File:** `cli/app.py` (`CLIApp.screen_district_summary`)
 
 ```
 Bihar Fraud Landscape
@@ -146,7 +150,7 @@ Muzaffarpur  ██████████            ₹1.1Cr · 156 leads
 
 ## Screen 8 — PDF Export
 
-**File:** `cli/screens/export.py`
+**File:** `cli/app.py` (`CLIApp.screen_export_evidence`)
 
 ```
 Generating evidence report for ACC-22451...
