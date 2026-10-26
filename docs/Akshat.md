@@ -632,30 +632,4 @@ Responsible for:
 These are demonstration targets or scenario figures, not verified real-world outcomes.
 
 
-# 17. Contingency Plan
-
-If the ML implementation is not ready before the deadline, the planned fallback is to ship:
-
-- Rule-based account risk detection
-- Human-readable explanation strings
-- Transaction-linked reasons
-- The working complaint-to-case investigation pipeline
-
-The fallback avoids making the full application dependent on LightGBM or SHAP completion.
-
----
-
-# 18. Conclusion
-
-Asher proposes an integrated cybercrime investigation platform that combines bank statement normalization, cross-bank transaction tracing, mule account detection, complaint correlation, recoverable-funds-based freeze prioritization, and automated legal documentation.
-
-Its principal value proposition is to help investigators move from a fraud complaint to a structured financial investigation and prioritized bank actions within one workbench.
-
-The project's success depends on maintaining a functional end-to-end workflow, ensuring the accuracy and explainability of transaction matching and risk scoring, and demonstrating its capabilities using synthetic data.
-
-**Project:** Asher — PS-01  
-**Event:** Bihar Government Cyber Hackathon 2026  
-**Team Size:** 3 Members  
-**Status:** Proposed Hackathon Implementation Plan
-
 *End of Project Summary*
