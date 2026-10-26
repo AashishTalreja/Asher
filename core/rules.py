@@ -19,13 +19,13 @@ import numpy as np
 RULE_WEIGHTS = {
     "rapid_in_out": 1.0,
     "high_velocity_24h": 0.8,
-    "round_amounts": 0.6,
+    "structuring_evasion_amounts": 0.6,
     "structuring_50k": 0.9,
     "dormancy_burst": 1.0,
     "new_account_high": 0.85,
     "shared_device_3plus": 0.9,
     "shared_phone_3plus": 0.85,
-    "kyc_recent_change": 0.7,
+    "kyc_minimal_high_turnover": 0.7,
     "no_salary_large_in": 0.75,
     "pass_through_high": 0.95,
     "night_burst": 0.8,
@@ -107,7 +107,7 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
     txn_count_24h = len(txns_24h)
 
     # -----------------------------------------------------------------------
-    # Rule 1: rapid_in_out (In-out gap < 10 min)
+    # Rule 1: rapid_in_out (outflow of 80-100% of an inflow within 10 min)
     # -----------------------------------------------------------------------
     rapid_found = False
     rapid_gap_min = 0.0
@@ -117,12 +117,17 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
     if len(inflow_24h_df) > 0 and len(outflow_24h_df) > 0:
         for _, in_row in inflow_24h_df.iterrows():
             time_diffs = (outflow_24h_df["dt"] - in_row["dt"]).dt.total_seconds()
-            matching_outs = outflow_24h_df[(time_diffs > 0) & (time_diffs <= 600)]
+            in_amt = float(in_row["amount"])
+            matching_outs = outflow_24h_df[
+                (time_diffs > 0) & (time_diffs <= 600) &
+                (outflow_24h_df["amount"] >= 0.8 * in_amt) &
+                (outflow_24h_df["amount"] <= in_amt)
+            ]
             if len(matching_outs) > 0:
                 rapid_found = True
                 first_out = matching_outs.iloc[0]
                 rapid_gap_min = (first_out["dt"] - in_row["dt"]).total_seconds() / 60.0
-                rapid_in_amt = float(in_row["amount"])
+                rapid_in_amt = in_amt
                 rapid_out_amt = float(first_out["amount"])
                 break
 
@@ -130,7 +135,7 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
         fired_rules.append({
             "rule": "rapid_in_out",
             "weight": RULE_WEIGHTS["rapid_in_out"],
-            "evidence": f"Inflow INR {rapid_in_amt:,.2f} followed by outflow INR {rapid_out_amt:,.2f} in {rapid_gap_min:.1f} min (< 10 min threshold)",
+            "evidence": f"Inflow INR {rapid_in_amt:,.2f} followed by outflow INR {rapid_out_amt:,.2f} ({rapid_out_amt / rapid_in_amt:.0%} of inflow) in {rapid_gap_min:.1f} min (< 10 min threshold)",
         })
 
     # -----------------------------------------------------------------------
@@ -144,7 +149,7 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
         })
 
     # -----------------------------------------------------------------------
-    # Rule 3: round_amounts (amount in {9999, 49999, 99999} or % 5000 == 0)
+    # Rule 3: structuring_evasion_amounts (amount in {9999, 49999, 99999} or % 5000 == 0)
     # -----------------------------------------------------------------------
     round_matches = []
     if len(txns_24h) > 0:
@@ -155,8 +160,8 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
 
     if len(round_matches) >= 3:
         fired_rules.append({
-            "rule": "round_amounts",
-            "weight": RULE_WEIGHTS["round_amounts"],
+            "rule": "structuring_evasion_amounts",
+            "weight": RULE_WEIGHTS["structuring_evasion_amounts"],
             "evidence": f"{len(round_matches)} round or evasion-pattern transactions (e.g. INR {round_matches[0]:,.2f})",
         })
 
@@ -261,13 +266,13 @@ def evaluate(account_id: str, ctx: dict = None) -> dict:
         })
 
     # -----------------------------------------------------------------------
-    # Rule 9: kyc_recent_change / sub-optimal kyc high turnover
+    # Rule 9: kyc_minimal_high_turnover (MINIMAL/PENDING KYC and sum_24h > 50K)
     # -----------------------------------------------------------------------
     kyc_status = str(acct_meta.get("kyc_status", "FULL")).upper()
     if kyc_status in ["MINIMAL", "PENDING"] and sum_24h > 50000.0:
         fired_rules.append({
-            "rule": "kyc_recent_change",
-            "weight": RULE_WEIGHTS["kyc_recent_change"],
+            "rule": "kyc_minimal_high_turnover",
+            "weight": RULE_WEIGHTS["kyc_minimal_high_turnover"],
             "evidence": f"Sub-optimal KYC status '{kyc_status}' with 24h turnover INR {sum_24h:,.2f} (> INR 50,000 threshold)",
         })
 

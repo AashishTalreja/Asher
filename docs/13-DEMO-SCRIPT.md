@@ -72,13 +72,13 @@ python main.py
   2. **Layer Contributions**:
      - Layer 1 (Rules Engine): **1.0000** (20.0 / 20.0 pts)
      - Layer 2 (Baseline Deviation): **1.0000** (20.0 / 20.0 pts)
-     - Layer 3 (ML Risk Scorer): **0.9983** (34.9 / 35.0 pts)
+     - Layer 3 (ML Risk Scorer): **1.0000** (35.0 / 35.0 pts)
      - Layer 4 (Complaint Correlator): **1.0000** (15.0 / 15.0 pts)
-     - Layer 5 (Graph Ring Ops): **1.0000** (10.0 / 10.0 pts)
+     - Layer 5 (Graph / Ring): **1.0000** (10.0 / 10.0 pts)
      - **Final Score: 99.9 / 100.0 [CRITICAL]**
-  3. **Fired RBI Rules**: `rapid_in_out` (4.0 min latency), `high_velocity_24h` (58 txns), `round_amounts` (57 evasion txns), `structuring_50k` (9 txns in ₹45k-₹50k window), `shared_device_3plus` (4 accounts on DEV-a8f3e2), `pass_through_high` (89.2% ratio).
-  4. **90-Day Baseline Jump**: Amount deviation **615.8σ** above historical mean (₹500); velocity spike **56.0σ** (58 txns vs 2.0 daily normal); novelty flag confirmed.
-  5. **NCRP Incidents**: 7 linked cases totaling ₹4,90,000.00 with complaint narratives.
+  3. **Fired RBI/FIU-IND Indicators**: `high_velocity_24h` (58 txns), `structuring_evasion_amounts` (57 evasion txns), `structuring_50k` (9 txns in ₹45k-₹50k window), `shared_device_3plus` (4 accounts on DEV-a8f3e2), `pass_through_high` (89.2% ratio).
+  4. **90-Day Baseline Jump**: Amount deviation **~32x normal amount** (historical mean INR 502); frequency **~29x normal daily frequency** (58 txns vs 2.0 daily normal); novelty flag confirmed.
+  5. **NCRP Incidents**: 7 linked cases totaling ₹4,87,850.00 with complaint narratives.
 
 ---
 

@@ -9,7 +9,7 @@
 | 3 | **Single code dump → disqualification** | Fatal | Medium | Commit every 45 min, push every 2h |
 | 4 | **Member 3 absent from git log → Grand Final fail** | Fatal | Medium | Assign him 5 doc/test commits |
 | 5 | **Alternate dataset crashes → Grand Final fail** | Severe | Medium | Test `seed=999` at hour 20 |
-| 6 | **XGBoost AUC too low** | Moderate | Medium | Fallback: drop ML, use rules+baseline+complaint+graph |
+| 6 | **RandomForest AUC too low** | Moderate | Medium | Fallback: drop ML, use rules+baseline+complaint+graph |
 | 7 | **Rich rendering broken on projector** | Moderate | Low | Test 3 terminals, `width=100`, plain-text fallback |
 | 8 | **Money trail BFS slow** | Moderate | Low | Cap hops=5, time window filter |
 | 9 | **Complaint regex misses variants** | Moderate | Medium | Unit test with 20 real NCRP examples |
@@ -26,14 +26,14 @@ Watch for these signs — they precede the above risks:
 
 - Person A or B hasn't committed in 2+ hours → **commit discipline slipping**
 - Data generator not producing expected counts → **fall back to fixed CSV**
-- XGBoost training loss not decreasing → **features are noise, switch to rules**
+- RandomForest validation AUC not improving → **features are noise, switch to rules**
 - Frontend not rendering Account 360 by hour 24 → **dedicate both members**
 - Video not started by hour 26 → **Person C owns it, record immediately**
 - 12:00 AM has < 15 commits → **stop features, catch up on git**
 
 ## Contingency Plans
 
-### If XGBoost fails (AUC < 0.75)
+### If the RandomForest fails (AUC < 0.75)
 
 **Fallback:** Drop ML layer. Reweight fusion:
 

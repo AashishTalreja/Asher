@@ -31,13 +31,15 @@ jobs:
         run: |
           python data_gen/generator.py --seed 42 --out data/
 
+      # Both checks load the synthetic CSVs through the app's own loader (CLIApp.load_data),
+      # so the engine scores against the same context the terminal UI uses.
       - name: Verify Core Detection & Weighted Fusion Engine
         run: |
-          python -c "from core import fusion; res = fusion.evaluate_account('ACC-22451'); assert res['score'] >= 80, 'Score must be CRITICAL'; print('Detection test passed. ACC-22451 Score:', res['score'], res['tier'])"
+          python -c "from cli.app import CLIApp; from core import fusion; ctx = CLIApp(data_dir='data').ctx; res = fusion.evaluate_account('ACC-22451', ctx=ctx); assert res['score'] >= 80, 'Score must be CRITICAL'; print('Detection test passed. ACC-22451 Score:', res['score'], res['tier'])"
 
       - name: Verify BSA §63 Electronic Evidence PDF Export
         run: |
-          python -c "from core import report; res = report.generate_pdf('ACC-22451'); assert res['sha256'], 'SHA-256 digest missing'; print('PDF test passed. SHA-256:', res['sha256'])"
+          python -c "from cli.app import CLIApp; from core import report; ctx = CLIApp(data_dir='data').ctx; res = report.generate_pdf('ACC-22451', ctx=ctx); assert res['sha256'], 'SHA-256 digest missing'; print('PDF test passed. SHA-256:', res['sha256'])"
 
       - name: Execute Terminal UI Smoke Test (Fallback Mode)
         run: |

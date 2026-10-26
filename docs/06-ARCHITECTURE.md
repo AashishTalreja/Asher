@@ -14,7 +14,7 @@
 │                                                               │
 │  ┌────────────┐  ┌────────────┐  ┌─────────────┐  ┌────────┐ │
 │  │  rules.py  │  │baseline.py │  │    ml.py    │  │fusion. │ │
-│  │ 12 RBI     │  │ 90d rolling│  │ XGBoost     │  │py      │ │
+│  │ 12 RBI     │  │ 90d rolling│  │ RandomForest│  │py      │ │
 │  │ flags      │  │ z-scores   │  │ features    │  │weights │ │
 │  └─────┬──────┘  └─────┬──────┘  └──────┬──────┘  └───┬────┘ │
 │        └────────────────┴────────────────┴─────────────┘      │
@@ -56,14 +56,13 @@
 |---|---|---|
 | `core/rules.py` | 12 RBI red-flag rules; returns fired + evidence | 120 |
 | `core/baseline.py` | 90-day rolling baseline; z-score deviation | 150 |
-| `core/ml.py` | XGBoost training + inference; feature extraction | 200 |
+| `core/ml.py` | RandomForest training + inference; feature extraction | 200 |
 | `core/complaints.py` | Regex + fuzzy entity resolution; incident clustering | 220 |
 | `core/graph_ops.py` | 5-hop BFS + chain classifier + Louvain | 200 |
 | `core/fusion.py` | Weighted score + event log | 100 |
 | `core/report.py` | PDF generation + SHA-256 chain | 180 |
 | `data_gen/generator.py` | Fixed ring + background + complaints | 250 |
-| `cli/menu.py` | Main menu + REPL | 120 |
-| `cli/screens/*.py` | 8 screens (~80–120 LOC each) | 700 |
+| `cli/app.py` | Main menu + REPL + 8 screens (`CLIApp.screen_*`) | 820 |
 | **Total** | | **~2240 LOC** |
 
 ## Data Flow

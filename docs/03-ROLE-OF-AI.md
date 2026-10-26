@@ -38,7 +38,7 @@ BAND 1: DETECT BAND 2: CONNECT BAND 3: DEFEND
 ───────────── ────────────── ──────────────
 Rules Entity Resolution Rule trace
 Baseline deviation Complaint clustering Score history log
-XGBoost risk Money trail traversal SHA-256 evidence chain
+RandomForest risk Money trail traversal SHA-256 evidence chain
 Louvain ring detect Intermediary scoring BSA §63 PDF report
 
 text

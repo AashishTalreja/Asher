@@ -25,7 +25,7 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
 **CHAKRAVYUH** reduces investigation latency from **3 weeks to under 90 seconds** by uniting:
 1. **12 RBI Red-Flag Rules** (instant velocity & structuring detection)
 2. **90-Day Per-Account Baseline Deviation** (individual anomaly $z$-scores)
-3. **20-Feature XGBoost ML Scorer** (supervised mule classification)
+3. **20-Feature Random Forest ML Scorer** (supervised mule classification)
 4. **4-Step RapidFuzz NCRP Correlator** (free-text NLP complaint matching)
 5. **NetworkX 5-Hop BFS & Louvain Clustering** (automated money trail & mule ring tracing)
 6. **Bharatiya Sakshya Adhiniyam (BSA) §63 PDF Exporter** (SHA-256 sealed court evidence)
@@ -52,7 +52,7 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
    │          90-day per-account rolling z-scores (σ jumps)      │
    │                                                             │
    │ Layer 3: ML Risk Scorer (core/ml.py)                        │
-   │          20-feature XGBoost model (velocity, flow, graph)   │
+   │          20-feature Random Forest (velocity, flow, graph)   │
    │                                                             │
    │ Layer 4: Complaint Correlator (core/complaints.py)          │
    │          4-step RapidFuzz entity extraction & clustering    │
@@ -83,15 +83,15 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
 
 ### 1. Layer 1 — Rules Engine (`core/rules.py` · Weight: 0.20)
 Evaluates 12 statutory RBI and FIU-IND red flags. Each rule evaluates `(fired: bool, weight: float, evidence: str)`:
-* `rapid_in_out`: Immediate debit within 10 minutes of credit (pass-through draining).
+* `rapid_in_out`: Debit of 80-100% of a credit within 10 minutes (pass-through draining).
 * `high_velocity_24h`: Transaction count exceeding 20 in a 24-hour window.
-* `round_amounts`: Evasion denominations (`₹9,999`, `₹49,999`, or multiples of `₹5,000`).
+* `structuring_evasion_amounts`: Evasion denominations (`₹9,999`, `₹49,999`, or multiples of `₹5,000`).
 * `structuring_50k`: Multiple transactions between `₹45,000` and `₹50,000` to evade PAN/reporting thresholds.
 * `dormancy_burst`: Dormant for > 90 days followed by > 5 transactions in 24 hours.
 * `new_account_high`: Account age < 90 days with 24-hour turnover > ₹1,00,000.
 * `shared_device_3plus`: Device ID shared across 3 or more bank accounts.
 * `shared_phone_3plus`: Mobile number shared across 3 or more bank accounts.
-* `kyc_recent_change`: Minimal/sub-optimal KYC with high turnover.
+* `kyc_minimal_high_turnover`: Minimal/sub-optimal KYC with high turnover.
 * `no_salary_large_in`: Single credit > ₹5,00,000 without regular payroll credit.
 * `pass_through_high`: 1-hour debit-to-credit pass-through ratio exceeding 85%.
 * `night_burst`: Concentrated burst between 00:00 and 06:00 IST.
@@ -102,8 +102,8 @@ $$\text{deviation\_score} = \sigma\Big(0.3 \cdot z_{\text{amt}} + 0.3 \cdot z_{\
 * **Cold-Start Safeguard**: Accounts $< 90$ days old or with $< 20$ historical transactions automatically fall back to population benchmarks and return `confidence: 'low'`.
 
 ### 3. Layer 3 — ML Risk Scorer (`core/ml.py` · Weight: 0.35)
-* **Model**: Supervised `xgboost.XGBClassifier(n_estimators=100, max_depth=5, scale_pos_weight=neg/pos)`.
-* **Fallback**: Automatic fallback to `sklearn.ensemble.RandomForestClassifier` if native XGBoost libraries are missing on the target host.
+* **Model**: Supervised `sklearn.ensemble.RandomForestClassifier(n_estimators=300, max_depth=5, max_features="sqrt", class_weight="balanced")`, saved to `models/rf.pkl`.
+* **Explanations**: Per-account top features are ranked by model importance × |z-score| of the account's value against all accounts.
 * **20 Features**: Velocity (1h, 24h, 7d), flow ratios, structuring counters, KYC completeness, shared device/phone counts, night transaction percentage, degree centrality, and graph neighborhood risk (`avg_neighbor_risk`).
 
 ### 4. Layer 4 — Complaint Correlator (`core/complaints.py` · Weight: 0.15)
@@ -137,33 +137,31 @@ Built with `rich` and `prompt_toolkit`. Capped at 100 columns for hackathon proj
 ### Screen 3: Account 360 Hero Screen
 ```
 ┌──────────────────────────────────────────────────────────────────────────────────────────────────┐
-│ ACCOUNT 360 · ACC-22451 · RISK 99.9 [CRITICAL]                                                   │
-│ Holder: Rahul Kumar · Age: 115d · District: Patna · Bank: SBI (SBIN0001234)                      │
-│ Phone: +91-9812345678 · Device: DEV-a8f3e2 · KYC: MINIMAL · Confidence: NORMAL                   │
-│ Score Trajectory: 34 -> 78 -> 91 -> 99.9 | Trigger: Rapid Inflow + Structuring + NCRP Match      │
+│ ACCOUNT 360 · ACC-22451 · RISK 99.9 (capped from 100.0) [CRITICAL]                               │
+│ Holder: Rahul Kumar · Account Age: 115 days · District: Patna · Bank: SBI (SBIN0001234)          │
+│ Phone: +91-9812345678 · Device: DEV-a8f3e2 · KYC: MINIMAL · Data Quality: OK                     │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────── LAYER CONTRIBUTIONS (EXACT WEIGHTED FUSION) ───────────────────────────┐
 │  Layer 1: Rules Engine   ■■■■■■■■■■■■■■■■■■  1.0000                 20.0 / 20.0 pts              │
 │  Layer 2: Baseline Dev   ■■■■■■■■■■■■■■■■■■  1.0000                 20.0 / 20.0 pts              │
-│  Layer 3: ML Scorer      ■■■■■■■■■■■■■■■■■■  0.9983                 34.9 / 35.0 pts              │
+│  Layer 3: ML Scorer      ■■■■■■■■■■■■■■■■■■  1.0000                 35.0 / 35.0 pts              │
 │  Layer 4: Complaints     ■■■■■■■■■■■■■■■■■■  1.0000                 15.0 / 15.0 pts              │
-│  Layer 5: Graph Ring Ops ■■■■■■■■■■■■■■■■■■  1.0000                 10.0 / 10.0 pts              │
+│  Layer 5: Graph / Ring   ■■■■■■■■■■■■■■■■■■  1.0000                 10.0 / 10.0 pts              │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
-┌─────────────────────────────── FIRED RBI RED-FLAG RULES (LAYER 1) ───────────────────────────────┐
-│   [✓] rapid_in_out         (wt: 1.00) -> Inflow INR 10,000 followed by outflow in 4.0 min        │
-│   [✓] high_velocity_24h    (wt: 0.80) -> 58 transactions in 24h window (threshold: > 20)         │
-│   [✓] round_amounts        (wt: 0.60) -> 57 evasion-pattern transactions (INR 9,999.00)          │
-│   [✓] structuring_50k      (wt: 0.90) -> 9 transactions structured between INR 45K and 50K       │
-│   [✓] shared_device_3plus  (wt: 0.90) -> Device DEV-a8f3e2 shared across 4 accounts              │
-│   [✓] pass_through_high    (wt: 0.95) -> Pass-through ratio 89.2% exceeds 85% threshold          │
+┌───────────────────────────── FIRED RBI/FIU-IND INDICATORS (LAYER 1) ─────────────────────────────┐
+│   [✓] high_velocity_24h           (wt: 0.80) -> 58 transactions in 24h (threshold: > 20)         │
+│   [✓] structuring_evasion_amounts (wt: 0.60) -> 57 evasion-pattern transactions (INR 9,999)      │
+│   [✓] structuring_50k             (wt: 0.90) -> 9 transactions between INR 45K and 50K           │
+│   [✓] shared_device_3plus         (wt: 0.90) -> Device DEV-a8f3e2 shared across 4 accounts       │
+│   [✓] pass_through_high           (wt: 0.95) -> Pass-through ratio 89.2% exceeds 85%             │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌────────────────────────────── 90-DAY BASELINE DEVIATION (LAYER 2) ───────────────────────────────┐
-│   Amount Deviation:    615.79 sigma above account's own 90-day rolling baseline                  │
-│   Frequency Jump:      55.98 sigma daily transaction frequency spike                             │
+│   Amount Deviation:    ~32x normal amount (vs account's own 90-day rolling baseline)             │
+│   Frequency Jump:      ~29x normal daily frequency (daily transaction count)                     │
 │   Behavioral Flags:    Novel Counterparties: DETECTED · Dormancy Break: CONFIRMED                │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘
 ┌──────────────────────────────── LINKED NCRP INCIDENTS (LAYER 4) ─────────────────────────────────┐
-│   Linked NCRP Complaints: 7 cases | Total: INR 490,000.00 | Districts: Patna, Nalanda            │
+│   Linked NCRP Complaints: 7 cases | Total: INR 487,850.00 | Districts: Patna, Nalanda            │
 │   Primary Fraud Modus: JOB_FRAUD, INVESTMENT, UPI_FRAUD, LOAN_APP                                │
 │   Latest Incident (NCRP-2026-3812): "₹5000 bheja, rahul***@ybl ko job ke liye, fir 42000 aur...   │
 └──────────────────────────────────────────────────────────────────────────────────────────────────┘

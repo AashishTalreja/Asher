@@ -1,7 +1,7 @@
 """
 Layer 3: ML Risk Scorer (core/ml.py)
 
-Implements the XGBoost binary risk classifier trained on 20 synthetic features:
+Implements a class-balanced RandomForest binary risk classifier trained on 20 synthetic features:
 - Velocity: txn_count_1h, txn_count_24h, txn_count_7d
 - Amount & Flow: sum_24h, mean_24h, max_24h, in_out_ratio_24h, pass_through_ratio_1h
 - Structuring & Evasion: count_below_50k, count_round_amounts
@@ -11,8 +11,9 @@ Implements the XGBoost binary risk classifier trained on 20 synthetic features:
 - Temporal: night_pct
 - Graph Neighborhood: degree, degree_centrality, avg_neighbor_risk
 
-Includes automatic fallback to RandomForestClassifier if XGBoost training is unavailable.
-Provides feature importances for per-alert explanations and cold-start confidence tracking.
+Per-alert explanations rank features by model importance x |z-score| of the account's value
+against all accounts, so large-unit features (amounts) don't crowd out ratios and counts.
+Also tracks cold-start confidence.
 
 Matches specifications in docs/09-DETECTION-PIPELINE.md and docs/07-TECHNICAL-SPECIFICATION.md.
 """
@@ -24,14 +25,9 @@ import numpy as np
 import pandas as pd
 import networkx as nx
 
-# Primary ML Model: XGBoost; Fallback: Scikit-learn
-try:
-    import xgboost as xgb
-    HAS_XGBOOST = True
-except ImportError:
-    HAS_XGBOOST = False
-
 from sklearn.ensemble import RandomForestClassifier
+
+MODEL_FILENAME = "rf.pkl"
 
 
 FEATURE_NAMES = [
@@ -239,7 +235,7 @@ def _extract_features_for_all(ctx: dict) -> tuple[np.ndarray, list[str], dict]:
 
 def train(txns: pd.DataFrame = None, labels: pd.Series = None, accounts_df: pd.DataFrame = None, ctx: dict = None) -> object:
     """
-    Trains XGBoost risk classifier (or RandomForestClassifier fallback) and saves to models/xgb.pkl.
+    Trains a class-balanced RandomForest risk classifier and saves it to models/rf.pkl.
     """
     ctx = _get_context(ctx)
     if txns is not None:
@@ -260,37 +256,21 @@ def train(txns: pd.DataFrame = None, labels: pd.Series = None, accounts_df: pd.D
     else:
         y = np.array([1 if aid in mule_accounts else 0 for aid in account_ids], dtype=int)
 
-    pos = max(1, (y == 1).sum())
-    neg = max(1, (y == 0).sum())
-    scale_weight = float(neg / pos)
-
-    model = None
-    if HAS_XGBOOST:
-        try:
-            model = xgb.XGBClassifier(
-                n_estimators=100,
-                max_depth=5,
-                scale_pos_weight=scale_weight,
-                eval_metric="auc",
-                random_state=42,
-            )
-            model.fit(X, y)
-        except Exception:
-            model = None
-
-    if model is None:
-        model = RandomForestClassifier(
-            n_estimators=100,
-            max_depth=5,
-            class_weight="balanced",
-            random_state=42,
-        )
-        model.fit(X, y)
+    # Random feature subsets per split (max_features="sqrt") stop one perfectly separating
+    # feature (shared_device_count) from absorbing all of the importance.
+    model = RandomForestClassifier(
+        n_estimators=300,
+        max_depth=5,
+        max_features="sqrt",
+        class_weight="balanced",
+        random_state=42,
+    )
+    model.fit(X, y)
 
     # Save trained model to disk
     models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
     os.makedirs(models_dir, exist_ok=True)
-    model_path = os.path.join(models_dir, "xgb.pkl")
+    model_path = os.path.join(models_dir, MODEL_FILENAME)
     with open(model_path, "wb") as f:
         pickle.dump(model, f)
 
@@ -304,7 +284,7 @@ def _get_or_load_model(ctx: dict) -> object:
         return _MODEL_CACHE["model"]
 
     models_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "models")
-    model_path = os.path.join(models_dir, "xgb.pkl")
+    model_path = os.path.join(models_dir, MODEL_FILENAME)
 
     if os.path.exists(model_path):
         try:
@@ -330,6 +310,7 @@ def predict(account_id: str, ctx: dict = None) -> dict:
         {
             'score': float,              # probability 0.0 to 1.0
             'top_features': [(name, importance), ...],
+            'feature_values': {name: value},  # this account's value for each top feature
             'confidence': 'low' | 'normal'
         }
     """
@@ -380,12 +361,17 @@ def predict(account_id: str, ctx: dict = None) -> dict:
     importances = getattr(model, "feature_importances_", np.ones(len(FEATURE_NAMES)) / len(FEATURE_NAMES))
     x_vec = x_acct[0]
     
-    # Meaningful feature ranking based on absolute value and model importance
-    top_indices = np.argsort(importances * np.abs(x_vec))[::-1][:4]
+    # Rank by importance x |z-score| vs. all accounts, so raw units (e.g. INR sums) don't dominate
+    mu = X.mean(axis=0)
+    sd = X.std(axis=0)
+    z = np.divide(x_vec - mu, sd, out=np.zeros_like(mu, dtype=float), where=sd > 0)
+    top_indices = np.argsort(importances * np.abs(z))[::-1][:4]
     top_features = [(FEATURE_NAMES[i], round(float(importances[i]), 4)) for i in top_indices]
+    feature_values = {FEATURE_NAMES[i]: float(x_vec[i]) for i in top_indices}
 
     return {
         "score": round(score_val, 4),
         "top_features": top_features,
+        "feature_values": feature_values,
         "confidence": "low" if cold_start else "normal",
     }
