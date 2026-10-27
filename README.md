@@ -32,6 +32,15 @@ Current police and banking investigations suffer from a **3-week latency gap**: 
 
 ---
 
+
+Screenshots:
+
+![image alt](https://github.com/AashishTalreja/asher/blob/main/docs/Screenshot%202026-10-27%20204759.png?raw=true)
+
+
+![image alt](https://github.com/AashishTalreja/asher/blob/main/docs/Screenshot%202026-10-27%20203839.png?raw=true)
+
+
 ## 🏛️ System Architecture
 
 ```
